@@ -1,0 +1,10 @@
+{
+  "name": "incident-response",
+  "amac": "Kullanıcının dışa aktardığı host kanıtlarını (crontab, systemd, authorized_keys, hesaplar/sudoers, SUID, ps/ss/last, şüpheli dosya kopyaları) salt-okunur inceleyip kalıcılık izlerini, IOC'leri ve zaman çizelgesini kanıtlı olay müdahale raporuna yazmak",
+  "tetikleyiciler": ["olay müdahalesi", "incident response", "adli inceleme", "forensics", "kalıcılık", "persistence", "crontab", "şüpheli betik", "ihlal", "IOC"],
+  "gerekli_girdi": ["kanıt klasörünün yerel yolu", "host adı"],
+  "ag_erisimi": false,
+  "risk": "orta",
+  "risk_gerekcesi": "Ağ erişimi yok ve salt-okunur; ancak girdi zararlı olabilecek dosyalar (şüpheli betik kopyaları) ve hassas host verisi (hesap listesi, authorized_keys, sudoers, süreç argümanları) içerir. Bash yalnızca hash ve sayım için verilir; kanıtın yanlışlıkla çalıştırılması riski Policy Gate kuralları (NOTLAR.md: K-1, K-2) uygulanana kadar yalnızca talimatla sınırlanır. Bu kurallar ve testleri eklendikten sonra risk 'dusuk' olarak yeniden değerlendirilebilir.",
+  "cikti": "@reports"
+}
