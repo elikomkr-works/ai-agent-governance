@@ -2,7 +2,9 @@
   "permissions": {
     "deny": [
       "Edit(/governance/audit.jsonl)",
-      "Edit(/knowledge/approved/**)"
+      "Edit(/knowledge/approved/**)",
+      "Edit(/.git/hooks/**)",
+      "Edit(/.git/config)"
     ]
   },
   "sandbox": {
@@ -10,6 +12,7 @@
     "autoAllowBashIfSandboxed": false,
     "allowUnsandboxedCommands": false,
     "failIfUnavailable": false,
+    "excludedCommands": ["git commit *", "git push *"],
     "network": {
       "allowedDomains": ["github.com", "api.github.com"]
     },

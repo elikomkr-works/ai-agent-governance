@@ -18,6 +18,9 @@ from urllib.parse import urlparse
 RANK = {"pass": 0, "ask": 1, "deny": 2}
 SHELL_TOOLS = {"Bash", "PowerShell"}
 SANDBOX_DEPS = ("bwrap", "socat")  # Claude Code sandbox'ının Linux bağımlılıkları
+GIT_UNSANDBOXED = {"commit", "push"}  # .claude/settings.json → sandbox.excludedCommands ile aynı
+GIT_EXEC_OPTIONS = ("--receive-pack", "--exec", "--upload-pack")
+UNSAFE_SHELL = re.compile(r"\$\(|`|[<>]")  # komut ikamesi, süreç ikamesi, yönlendirme
 WRITE_TOOLS = {"Write", "Edit", "MultiEdit", "NotebookEdit"}
 
 IP_LIKE = re.compile(r"^\d{1,3}(\.[\d*,-]{1,11}){3}(/\d{1,2})?$")
@@ -206,7 +209,28 @@ def evaluate(data, policy, skills, rel_path, agents=frozenset()):
     return v
 
 
-def apply_cloud_rules(v, tool, env=os.environ, which=shutil.which):
+def check_unsandboxed_git(command, v):
+    """settings.json → sandbox.excludedCommands ile sandbox dışında çalışan git komutları.
+
+    Bulutta commit imzası 127.0.0.1'deki bir servise gider; sandbox'ın ağ ad alanından
+    oraya ulaşılamadığı için git commit/push sandbox dışında çalışır. Bu komutun içine
+    gömülen her şey de sandbox dışında çalışacağından: zincir, komut ikamesi ve
+    yönlendirme yasak; push'a yerel komut çalıştıran seçenek verilemez. Git'in kendi
+    çalıştırdığı betikler (.git/hooks, .git/config) permissions.deny ile korunur.
+    """
+    segs = segments(command)
+    for seg in segs:
+        tokens = tokenize(seg)
+        if len(tokens) < 2 or tool_name(tokens[0]) != "git" or tokens[1] not in GIT_UNSANDBOXED:
+            continue
+        if len(segs) > 1 or UNSAFE_SHELL.search(command):
+            v.add("deny", f"git {tokens[1]} sandbox dışında çalışır; tek başına, komut ikamesi ve "
+                          "yönlendirme olmadan çalıştırın (mesaj için -m \"...\" veya -F <dosya>).")
+        if any(t.startswith(GIT_EXEC_OPTIONS) for t in tokens):
+            v.add("deny", f"git {tokens[1]}'a yerel komut çalıştıran seçenek verilemez ({', '.join(GIT_EXEC_OPTIONS)}).")
+
+
+def apply_cloud_rules(v, tool, command="", env=os.environ, which=shutil.which):
     """Bulut oturumu (CLAUDE_CODE_REMOTE=true) için ek kurallar.
 
     2026-10-25 bulut kural testi iki açık gösterdi:
@@ -214,6 +238,7 @@ def apply_cloud_rules(v, tool, env=os.environ, which=shutil.which):
     - Sandbox Linux'ta bubblewrap ve socat ister; yoksa Claude Code komutları sessizce
       sandbox'sız çalıştırır (failIfUnavailable yerel Windows yüzünden false). Bu durumda
       kabuk komutları reddedilir; paketleri tools/cloud_setup.sh kurar.
+    Sandbox yalnızca bulutta çalıştığı için sandbox dışı git kuralları da burada uygulanır.
     """
     if env.get("CLAUDE_CODE_REMOTE") != "true":
         return v
@@ -224,6 +249,7 @@ def apply_cloud_rules(v, tool, env=os.environ, which=shutil.which):
         if missing:
             v.add("deny", f"Bulutta sandbox bağımlılığı eksik ({', '.join(missing)}); komut sandbox'sız "
                           "çalışırdı. Ortamın kurulum betiğine tools/cloud_setup.sh içeriğini ekleyin.")
+        check_unsandboxed_git(command, v)
     return v
 
 
@@ -245,7 +271,7 @@ def main():
         data = json.load(sys.stdin)
         v = evaluate(data, govlib.load_policy(), govlib.registered_skills(), govlib.rel_path,
                      govlib.registered_agents())
-        apply_cloud_rules(v, data.get("tool_name", ""))
+        apply_cloud_rules(v, data.get("tool_name", ""), (data.get("tool_input") or {}).get("command", ""))
         decision, reason = v.decision, " | ".join(v.reasons)
     except Exception as e:
         decision, reason = "deny", f"DENY: Policy Gate çalışamadı, güvenli tarafta kalındı: {e!r}"
