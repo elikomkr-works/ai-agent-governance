@@ -11,11 +11,13 @@ import json
 import os
 import re
 import shlex
+import shutil
 import sys
 from urllib.parse import urlparse
 
 RANK = {"pass": 0, "ask": 1, "deny": 2}
 SHELL_TOOLS = {"Bash", "PowerShell"}
+SANDBOX_DEPS = ("bwrap", "socat")  # Claude Code sandbox'ının Linux bağımlılıkları
 WRITE_TOOLS = {"Write", "Edit", "MultiEdit", "NotebookEdit"}
 
 IP_LIKE = re.compile(r"^\d{1,3}(\.[\d*,-]{1,11}){3}(/\d{1,2})?$")
@@ -204,6 +206,27 @@ def evaluate(data, policy, skills, rel_path, agents=frozenset()):
     return v
 
 
+def apply_cloud_rules(v, tool, env=os.environ, which=shutil.which):
+    """Bulut oturumu (CLAUDE_CODE_REMOTE=true) için ek kurallar.
+
+    2026-10-25 bulut kural testi iki açık gösterdi:
+    - Bulutta onaylayan kullanıcı yok; 'ask' kararı komutu durdurmadı. Bu yüzden ask → deny.
+    - Sandbox Linux'ta bubblewrap ve socat ister; yoksa Claude Code komutları sessizce
+      sandbox'sız çalıştırır (failIfUnavailable yerel Windows yüzünden false). Bu durumda
+      kabuk komutları reddedilir; paketleri tools/cloud_setup.sh kurar.
+    """
+    if env.get("CLAUDE_CODE_REMOTE") != "true":
+        return v
+    if v.decision == "ask":
+        v.add("deny", "Bulut oturumunda onaylayan kullanıcı yok; onay gerektiren işlem reddedildi.")
+    if tool in SHELL_TOOLS:
+        missing = [dep for dep in SANDBOX_DEPS if not which(dep)]
+        if missing:
+            v.add("deny", f"Bulutta sandbox bağımlılığı eksik ({', '.join(missing)}); komut sandbox'sız "
+                          "çalışırdı. Ortamın kurulum betiğine tools/cloud_setup.sh içeriğini ekleyin.")
+    return v
+
+
 def summarize(data):
     inp = data.get("tool_input") or {}
     for key in ("command", "file_path", "skill", "url", "query", "pattern"):
@@ -222,6 +245,7 @@ def main():
         data = json.load(sys.stdin)
         v = evaluate(data, govlib.load_policy(), govlib.registered_skills(), govlib.rel_path,
                      govlib.registered_agents())
+        apply_cloud_rules(v, data.get("tool_name", ""))
         decision, reason = v.decision, " | ".join(v.reasons)
     except Exception as e:
         decision, reason = "deny", f"DENY: Policy Gate çalışamadı, güvenli tarafta kalındı: {e!r}"
