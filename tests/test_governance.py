@@ -74,6 +74,7 @@ GATE_CASES = [
      {"command": f"echo x > '{P('policy').as_posix()}'"}, "ask"),
     ("onaylı bilgiyi okuma serbest", "Bash", {"command": f"cat {R('approved')}a.md 2>/dev/null"}, "pass"),
     ("denetim kaydına yazma", "Edit", {"file_path": R("audit_log")}, "deny"),
+    ("denetim dilimine yazma", "Write", {"file_path": R("audit_archive") + "x.jsonl"}, "deny"),
     ("politika değişikliği", "Edit", {"file_path": R("policy")}, "ask"),
     ("yol yapılandırması değişikliği", "Write", {"file_path": str(P("paths_file"))}, "ask"),
     ("hook değişikliği", "Write", {"file_path": str(HOOKS / "policy_gate.py")}, "ask"),
@@ -439,6 +440,7 @@ def settings_checks():
     yield "failIfUnavailable Windows'u kilitlemez", sandbox.get("failIfUnavailable") is not True
     yield "denetim kaydına yazma işletim sistemi düzeyinde yasak", f"Edit(/{R('audit_log')})" in deny
     yield "onaylı bilgiye yazma işletim sistemi düzeyinde yasak", f"Edit(/{R('approved')}**)" in deny
+    yield "denetim dilimlerine yazma işletim sistemi düzeyinde yasak", f"Edit(/{R('audit_archive')}**)" in deny
     # Sandbox dışında çalışan git, bu dosyalardaki betikleri çalıştırır.
     yield "git hook ve config yazımı yasak", {"Edit(/.git/hooks/**)", "Edit(/.git/config)"} <= set(deny)
     yield "izin reddi kaydı hook'ları bağlı", all(

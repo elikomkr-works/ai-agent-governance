@@ -2,6 +2,7 @@
   "permissions": {
     "deny": [
       "Edit(/governance/audit.jsonl)",
+      "Edit(/governance/audit_archive/**)",
       "Edit(/knowledge/approved/**)",
       "Edit(/.git/hooks/**)",
       "Edit(/.git/config)"
