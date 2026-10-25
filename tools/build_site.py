@@ -17,7 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / ".claude" / "hooks"))
 import govlib  # noqa: E402
 
-FIELDS = ("ts", "event", "tool", "decision", "reason", "detail")
+FIELDS = ("ts", "session", "agent", "event", "tool", "decision", "reason", "detail")
 PLACEHOLDER = "/*__PANEL_DATA__*/"
 
 
