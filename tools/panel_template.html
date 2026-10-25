@@ -171,7 +171,7 @@ table { width: 100%; border-collapse: collapse; font-size: 13px; }
 th { padding: 8px 10px; border-bottom: 1px solid var(--axis); color: var(--text-2); font-weight: 600; text-align: left; white-space: nowrap; }
 td { padding: 8px 10px; border-bottom: 1px solid var(--grid); vertical-align: top; }
 th.num, td.num { text-align: right; font-variant-numeric: tabular-nums; }
-.records { min-width: 760px; }
+.records { min-width: 920px; }
 .records td.time { white-space: nowrap; color: var(--text-2); font-variant-numeric: tabular-nums; }
 .records td.nowrap { white-space: nowrap; }
 .records tbody tr { cursor: pointer; }
@@ -205,6 +205,7 @@ footer p { margin: 0 0 4px; }
     <label class="field"><span>Zaman aralığı</span><select id="f-range"></select></label>
     <label class="field"><span>Bileşen</span><select id="f-event"></select></label>
     <label class="field"><span>Araç</span><select id="f-tool"></select></label>
+    <label class="field"><span>Agent</span><select id="f-agent"></select></label>
     <label class="field"><span>Ara</span><input id="f-q" type="search" placeholder="komut, dosya, gerekçe…" autocomplete="off"></label>
     <div class="field"><span id="chips-label">Karar</span><div class="chips" id="f-groups" role="group" aria-labelledby="chips-label"></div></div>
     <button class="btn" id="f-reset" type="button">Sıfırla</button>
@@ -240,7 +241,7 @@ footer p { margin: 0 0 4px; }
     </div>
     <div class="table-wrap">
       <table class="records">
-        <thead><tr><th>Zaman</th><th>Bileşen</th><th>Araç</th><th>Karar</th><th>Gerekçe</th><th>Ayrıntı</th></tr></thead>
+        <thead><tr><th>Zaman</th><th>Bileşen</th><th>Araç</th><th>Oturum</th><th>Agent</th><th>Karar</th><th>Gerekçe</th><th>Ayrıntı</th></tr></thead>
         <tbody id="rows"></tbody>
       </table>
     </div>
@@ -321,6 +322,8 @@ const ROOT_RE = (() => {
   return new RegExp(forms.map(esc).join('|'), 'gi');
 })();
 
+const MAIN_AGENT = 'Baş Agent';
+
 const records = DATA.records.map((r, i) => {
   const d = DECISIONS[r.decision];
   const t = Date.parse(r.ts);
@@ -328,14 +331,16 @@ const records = DATA.records.map((r, i) => {
     i,
     t: Number.isNaN(t) ? null : t,
     label: d ? d[0] : (r.decision || '—'),
+    // Oturum kimliği olan ama agent alanı boş kayıt ana oturumdan gelir; hash zinciri öncesi kayıtlarda ikisi de yoktur.
+    who: r.agent || (r.session ? MAIN_AGENT : ''),
     group: d ? d[1] : 'serbest',
     shown: r.detail.replace(ROOT_RE, '.'),
-    hay: [r.event, EVENTS[r.event], r.tool, r.decision, d && d[0], r.reason, r.detail]
+    hay: [r.event, EVENTS[r.event], r.tool, r.session, r.agent, r.decision, d && d[0], r.reason, r.detail]
       .filter(Boolean).join(' ').toLocaleLowerCase('tr'),
   });
 });
 
-const state = { range: 'all', event: '', tool: '', q: '', groups: new Set(GROUPS.map(g => g.key)), shown: PAGE, desc: true };
+const state = { range: 'all', event: '', tool: '', who: '', q: '', groups: new Set(GROUPS.map(g => g.key)), shown: PAGE, desc: true };
 
 function pick(ignoreGroups) {
   const span = RANGES.find(r => r[0] === state.range)[2];
@@ -344,6 +349,7 @@ function pick(ignoreGroups) {
     (!span || (r.t != null && r.t >= since)) &&
     (!state.event || r.event === state.event) &&
     (!state.tool || r.tool === state.tool) &&
+    (!state.who || r.who === state.who) &&
     (!state.q || r.hay.includes(state.q)) &&
     (ignoreGroups || state.groups.has(r.group)));
 }
@@ -612,6 +618,8 @@ function renderRows(rows) {
       el('td', { class: 'time', text: r.t != null ? dtFull.format(r.t) : (r.ts || '—') }),
       el('td', { class: 'nowrap', text: EVENTS[r.event] || r.event || '—', title: r.event }),
       el('td', { text: r.tool || '—' }),
+      el('td', { class: 'nowrap mono', text: r.session ? r.session.slice(0, 8) : '—', title: r.session }),
+      el('td', { class: 'nowrap', text: r.who || '—' }),
       el('td', {}, el('span', { class: 'badge' }, statusIcon(g), r.label)),
       el('td', { class: 'reason' }, el('div', { class: 'clamp', text: r.reason || '—' })),
       el('td', { class: 'detail' }, el('div', { class: 'clamp mono', text: r.shown || '—' })));
@@ -641,6 +649,8 @@ $('#f-event').replaceChildren(el('option', { value: '', text: 'Tümü' }),
   ...tally('event').map(([v, n]) => el('option', { value: v, text: `${EVENTS[v] || v || '—'} (${nf.format(n)})` })));
 $('#f-tool').replaceChildren(el('option', { value: '', text: 'Tümü' }),
   ...tally('tool').map(([v, n]) => el('option', { value: v, text: `${v || '—'} (${nf.format(n)})` })));
+$('#f-agent').replaceChildren(el('option', { value: '', text: 'Tümü' }),
+  ...tally('who').map(([v, n]) => el('option', { value: v, text: `${v || '—'} (${nf.format(n)})` })));
 
 const chips = GROUPS.map(g => {
   const n = el('span', { class: 'n' });
@@ -698,6 +708,7 @@ function onFilter(sel, key) {
 onFilter('#f-range', 'range');
 onFilter('#f-event', 'event');
 onFilter('#f-tool', 'tool');
+onFilter('#f-agent', 'who');
 
 let qTimer;
 $('#f-q').addEventListener('input', e => {
@@ -706,10 +717,11 @@ $('#f-q').addEventListener('input', e => {
 });
 
 $('#f-reset').addEventListener('click', () => {
-  Object.assign(state, { range: 'all', event: '', tool: '', q: '', groups: new Set(GROUPS.map(g => g.key)), shown: PAGE });
+  Object.assign(state, { range: 'all', event: '', tool: '', who: '', q: '', groups: new Set(GROUPS.map(g => g.key)), shown: PAGE });
   $('#f-range').value = 'all';
   $('#f-event').value = '';
   $('#f-tool').value = '';
+  $('#f-agent').value = '';
   $('#f-q').value = '';
   render();
 });
