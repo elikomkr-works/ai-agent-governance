@@ -57,7 +57,8 @@ def tokenize(segment):
 
 
 def segments(command):
-    return [s.strip() for s in re.split(r"\|\||&&|[;|\n]", command) if s.strip()]
+    # Tek '&' (arka plan) da yeni komut başlatır; '2>&1', '&>' gibi yönlendirmeler bölünmez.
+    return [s.strip() for s in re.split(r"\|\||&&|[;|\n]|(?<![<>&])&(?![>&])", command) if s.strip()]
 
 
 def in_scope(target, allowed):
@@ -227,7 +228,8 @@ def main():
 
     try:
         if govlib:
-            govlib.audit("PreToolUse", data.get("tool_name", "?"), decision, reason, summarize(data))
+            govlib.audit("PreToolUse", data.get("tool_name", "?"), decision, reason, summarize(data),
+                         data if isinstance(data, dict) else None)
     except Exception:
         pass
 
