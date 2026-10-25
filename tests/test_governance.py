@@ -22,6 +22,7 @@ import validator  # noqa: E402
 
 sys.path.insert(0, str(govlib.path("tools")))
 import build_site  # noqa: E402
+import verify_audit  # noqa: E402
 
 ENV = dict(os.environ, GOV_AUDIT_LOG=str(Path(tempfile.gettempdir()) / "gov_test_audit.jsonl"))
 P = govlib.path
@@ -197,6 +198,77 @@ def panel_checks():
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+CONCURRENT_WRITER = """
+import os, sys
+sys.path.insert(0, sys.argv[1])
+import govlib
+for i in range(int(sys.argv[2])):
+    govlib.audit("Test", "yazici", "pass", "", f"{os.getpid()}-{i}", {"session_id": f"s{os.getpid()}"})
+"""
+
+
+def audit_checks():
+    """Hash zinciri, oturum kimliği, yalnızca-ekleme ve onay kaydı kontrolleri: (açıklama, sonuç)."""
+    tmp = Path(tempfile.mkdtemp(prefix="gov_audit_"))
+    saved = os.environ.get("GOV_AUDIT_LOG")
+    try:
+        log, approved = tmp / "audit.jsonl", tmp / "approved"
+        approved.mkdir()
+        legacy = json.dumps({"ts": "2026-10-25T10:00:00+00:00", "event": "PreToolUse", "decision": "pass"})
+        log.write_text(legacy + "\n", encoding="utf-8")
+        os.environ["GOV_AUDIT_LOG"] = str(log)
+        for i in range(4):
+            govlib.audit("PreToolUse", "Bash", "pass", "", f"komut {i}", {"session_id": "oturum-a", "agent_type": "log-analyst"})
+        lines = log.read_text(encoding="utf-8").splitlines()
+        recs = [json.loads(ln) for ln in lines]
+        yield "eski kayıtlar zincire bağlanır", recs[1]["prev"] == govlib.line_hash(legacy)
+        yield "oturum ve agent kaydedilir", recs[2]["session"] == "oturum-a" and recs[2]["agent"] == "log-analyst"
+        yield "sağlam zincir hatasız", verify_audit.verify(log, approved)[1] == []
+
+        def verify_text(text, base=None):
+            bad = tmp / "bozuk.jsonl"
+            bad.write_text(text, encoding="utf-8")
+            return verify_audit.verify(bad, approved, base)[1]
+
+        yield "değiştirilen satır bulunur", bool(verify_text("\n".join(lines).replace("komut 1", "komut X") + "\n"))
+        yield "silinen satır bulunur", bool(verify_text("\n".join(lines[:2] + lines[3:]) + "\n"))
+        yield "CRLF satır sonu zinciri bozmaz", verify_text("\r\n".join(lines) + "\r\n") == []
+        base = ("\n".join(lines[:3]) + "\n").encode("utf-8")
+        yield "ekleme ile büyüyen kayıt geçer", verify_audit.verify(log, approved, base)[1] == []
+        yield "tabanı değiştirilmiş kayıt reddedilir", bool(verify_audit.verify(log, approved, base.replace(b"komut 0", b"komut Y"))[1])
+        yield "kısalan kayıt reddedilir", bool(verify_text("\n".join(lines[:2]) + "\n", log.read_bytes()))
+
+        (approved / "x.md").write_text("x", encoding="utf-8")
+        yield "onaysız eklenen bilgi bulunur", bool(verify_audit.verify(log, approved)[1])
+        govlib.audit("Approve", "approve.py", "onaylandi", "onaylayan=test", "x.md")
+        yield "Approve kaydı olan bilgi geçer", verify_audit.verify(log, approved)[1] == []
+
+        par = tmp / "paralel.jsonl"
+        env = dict(os.environ, GOV_AUDIT_LOG=str(par))
+        procs = [subprocess.Popen([sys.executable, "-c", CONCURRENT_WRITER, str(HOOKS), "25"], env=env) for _ in range(6)]
+        codes = [p.wait(timeout=60) for p in procs]
+        n, errs = verify_audit.verify(par, approved / "yok")
+        yield "paralel yazan 6 süreç zinciri çatallamaz", codes == [0] * 6 and n == 150 and errs == []
+    finally:
+        if saved is None:
+            os.environ.pop("GOV_AUDIT_LOG", None)
+        else:
+            os.environ["GOV_AUDIT_LOG"] = saved
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def settings_checks():
+    """.claude/settings.json: sandbox ve yazma yasakları paths.json ile uyumlu mu: (açıklama, sonuç)."""
+    settings = govlib.load_json(ROOT / ".claude" / "settings.json")
+    deny = settings.get("permissions", {}).get("deny", [])
+    sandbox = settings.get("sandbox", {})
+    yield "sandbox açık, sandbox dışı kaçış kapalı", sandbox.get("enabled") is True and sandbox.get("allowUnsandboxedCommands") is False
+    # Yerel Windows'ta sandbox yok; true olursa Claude Code orada hiç açılmaz.
+    yield "failIfUnavailable Windows'u kilitlemez", sandbox.get("failIfUnavailable") is not True
+    yield "denetim kaydına yazma işletim sistemi düzeyinde yasak", f"Edit(/{R('audit_log')})" in deny
+    yield "onaylı bilgiye yazma işletim sistemi düzeyinde yasak", f"Edit(/{R('approved')}**)" in deny
+
+
 def main():
     sys.stdout.reconfigure(encoding="utf-8")
     failures = 0
@@ -246,6 +318,14 @@ def main():
 
     print("== Panel ==")
     for label, ok in panel_checks():
+        report(ok, label)
+
+    print("== Denetim kaydı bütünlüğü ==")
+    for label, ok in audit_checks():
+        report(ok, label)
+
+    print("== Sandbox ayarları ==")
+    for label, ok in settings_checks():
         report(ok, label)
 
     print(f"\nSonuç: {failures} başarısız" if failures else "\nSonuç: tüm testler geçti")

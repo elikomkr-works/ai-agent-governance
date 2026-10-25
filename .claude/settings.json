@@ -1,4 +1,25 @@
 {
+  "permissions": {
+    "deny": [
+      "Edit(/governance/audit.jsonl)",
+      "Edit(/knowledge/approved/**)"
+    ]
+  },
+  "sandbox": {
+    "enabled": true,
+    "autoAllowBashIfSandboxed": false,
+    "allowUnsandboxedCommands": false,
+    "failIfUnavailable": false,
+    "network": {
+      "allowedDomains": ["github.com", "api.github.com"]
+    },
+    "credentials": {
+      "files": [
+        { "path": "~/.ssh", "mode": "deny" },
+        { "path": "~/.aws", "mode": "deny" }
+      ]
+    }
+  },
   "hooks": {
     "PreToolUse": [
       {

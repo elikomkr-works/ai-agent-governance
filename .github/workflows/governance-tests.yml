@@ -5,17 +5,57 @@ on:
   pull_request:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # yalnızca-ekleme kontrolü önceki commit'i okur
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
       - name: Hook testleri
         run: python3 tests/test_governance.py
       - name: Başlatıcı Linux'ta Python buluyor mu
+        env:
+          GOV_AUDIT_LOG: ${{ runner.temp }}/audit_test.jsonl  # depodaki kayda yazılmasın
         run: |
           echo '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"nmap 8.8.8.8"}}' \
             | bash .claude/hooks/run.sh policy_gate.py | grep -q '"deny"'
+      - name: Denetim kaydı bütünlüğü (zincir, yalnızca ekleme, onay kayıtları)
+        env:
+          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          if [ -n "$BASE" ] && git cat-file -e "$BASE^{commit}" 2>/dev/null; then
+            python3 tools/verify_audit.py --base "$BASE"
+          else
+            python3 tools/verify_audit.py
+          fi
+
+  pages:
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Paneli üret
+        run: python3 tools/build_site.py
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - id: deploy
+        uses: actions/deploy-pages@v4

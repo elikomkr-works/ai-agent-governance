@@ -3,10 +3,12 @@
 Klasör ve dosya yolları governance/paths.json'dan okunur (tek kaynak);
 diğer modüller yolları path() / rel() ile alır, kendileri yazmaz.
 """
+import hashlib
 import json
 import os
 import re
 import sys
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
 
@@ -98,11 +100,66 @@ def registered_agents():
     return {a["name"] for a in load_json(path("agents_registry"))["agents"]}
 
 
-def audit(event, tool, decision, reason, detail=""):
-    """Her kararı denetim kaydına ekler (yalnızca ekleme)."""
+GENESIS = "0" * 64
+
+
+def line_hash(line):
+    """Denetim kaydı satırının özeti; satır sonu (\\n veya \\r\\n) hesaba katılmaz."""
+    if isinstance(line, str):
+        line = line.encode("utf-8")
+    return hashlib.sha256(line.rstrip(b"\r\n")).hexdigest()
+
+
+def last_line(f):
+    """İkili kipte açık dosyanın son boş olmayan satırı (yoksa b'')."""
+    f.seek(0, os.SEEK_END)
+    pos, buf = f.tell(), b""
+    while pos > 0:
+        step = min(4096, pos)
+        pos -= step
+        f.seek(pos)
+        buf = f.read(step) + buf
+        lines = [ln for ln in buf.splitlines() if ln.strip()]
+        if len(lines) > 1 or (lines and pos == 0):
+            return lines[-1]
+    return b""
+
+
+@contextmanager
+def locked(f):
+    """Dosyaya özel kilit; aynı anda yazan oturumlar zinciri çatallayamaz."""
+    if os.name == "nt":
+        import msvcrt
+        f.seek(0)
+        msvcrt.locking(f.fileno(), msvcrt.LK_LOCK, 1)  # 0. bayt kilit bayrağı; ekleme yazımını engellemez
+        try:
+            yield
+        finally:
+            f.seek(0)
+            msvcrt.locking(f.fileno(), msvcrt.LK_UNLCK, 1)
+    else:
+        import fcntl
+        fcntl.flock(f, fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(f, fcntl.LOCK_UN)
+
+
+def audit(event, tool, decision, reason, detail="", hook_data=None):
+    """Her kararı denetim kaydına ekler (yalnızca ekleme, hash zincirli).
+
+    'prev' önceki satırın SHA-256 özetidir; bir satır silinir veya değiştirilirse
+    zincir kopar ve tools/verify_audit.py bunu bulur. 'session' ve 'agent'
+    hook girdisinden gelir; aynı klasörde birden çok oturum çalışırken kaydı kimin
+    ürettiği ayırt edilir.
+    """
+    hook_data = hook_data or {}
     log = Path(os.environ.get("GOV_AUDIT_LOG") or path("audit_log"))
     record = {
         "ts": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "session": str(hook_data.get("session_id", ""))[:64],
+        "agent": str(hook_data.get("agent_type") or hook_data.get("agent_id") or "")[:64],
         "event": event,
         "tool": tool,
         "decision": decision,
@@ -110,8 +167,10 @@ def audit(event, tool, decision, reason, detail=""):
         "detail": detail[:300],
     }
     log.parent.mkdir(parents=True, exist_ok=True)
-    with open(log, "a", encoding="utf-8") as f:
-        f.write(json.dumps(record, ensure_ascii=False) + "\n")
+    with open(log, "a+b") as f, locked(f):
+        prev = last_line(f)
+        record["prev"] = line_hash(prev) if prev else GENESIS
+        f.write((json.dumps(record, ensure_ascii=False) + "\n").encode("utf-8"))
 
 
 def rel_path(p):

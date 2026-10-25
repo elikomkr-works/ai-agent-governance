@@ -66,6 +66,12 @@ Tüm klasör ve dosya yollarının tek kaynağı `governance/paths.json` dosyas�
 
 ## Komutlar
 - Hook testleri: `python3 tests/test_governance.py` (Windows'ta `python`)
-- Denetim paneli: `python3 tools/build_site.py` → `site/index.html` (salt-okunur, tarayıcıda açılır)
+- Denetim paneli: `python3 tools/build_site.py` → `site/index.html` (salt-okunur, tarayıcıda açılır). CI, `main` dalında paneli GitHub Pages'e yayınlar.
+- Denetim kaydı bütünlüğü: `python3 tools/verify_audit.py [--base <git ref>]` (hash zinciri, yalnızca ekleme, her onaylı dosyanın Approve kaydı)
+
+## Katmanlı savunma
+1. Policy Gate (hook): komut metnini ve dosya yolunu denetler. Komut metnine baktığı için tek başına atlatılabilir.
+2. Sandbox (`.claude/settings.json` → `sandbox`): Bash'i işletim sistemi düzeyinde sınırlar (yazma: proje + geçici dizin; ağ: izinli alan adları). Yalnızca macOS/Linux/WSL2'de çalışır; yerel Windows'ta komutlar sandbox'sız çalışır, bu katman bulut oturumlarında etkindir.
+3. Denetim kaydı: hash zincirli, `session` ve `agent` alanlı; CI her push'ta zinciri ve yalnızca-ekleme kuralını git geçmişine karşı doğrular.
 - Onay (yalnızca kullanıcı): `python3 tools/approve.py knowledge/quarantine/<dosya>.md`
 - Kapsama hedef eklemek: `governance/policy.json` → `scope.allowed_targets` (elle düzenleyin)

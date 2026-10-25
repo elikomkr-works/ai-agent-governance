@@ -142,7 +142,7 @@ def handle(data, govlib):
         rel, errors = check_file(path, govlib)
         if not rel.startswith(tuple(prefix for prefix, _, _ in governed_dirs(govlib))):
             return None
-        govlib.audit("Validator", tool, "red" if errors else "kabul", "; ".join(errors), rel)
+        govlib.audit("Validator", tool, "red" if errors else "kabul", "; ".join(errors), rel, data)
         if errors:
             return {"decision": "block",
                     "reason": "[Validator] Dosya kurallara uymuyor, düzelt:\n" + format_errors([(rel, errors)])}
@@ -154,7 +154,7 @@ def handle(data, govlib):
         if not failed:
             return None
         msg = format_errors(failed)
-        govlib.audit("Validator", "Stop", "red", msg)
+        govlib.audit("Validator", "Stop", "red", msg, hook_data=data)
         if data.get("stop_hook_active"):
             return {"systemMessage": "⚠ Validator: aşağıdaki çıktılar doğrulamadan geçmedi, kabul edilmiş sayılmaz:\n" + msg}
         return {"decision": "block",
