@@ -188,11 +188,16 @@ def panel_checks():
         m = re.search(r'<script type="application/json" id="panel-data">(.*?)</script>', html, re.S)
         data = json.loads(m.group(1)) if m else {}
         yield "geçerli satırlar okunur, bozuklar sayılır", counts == (2, 2)
-        yield "bozuk satırların numarası raporlanır", [e["line"] for e in data.get("errors", [])] == [2, 4]
+        yield "bozuk satırların numarası raporlanır", [e["line"] for e in data.get("errors", [])] == ["satır 2", "satır 4"]
         yield "kayıttaki </script> sayfayı kıramaz", html.count("</script>") == 2 and "<script>alert" not in html
         yield "gömülü veri aslına sadık", bool(data) and data["records"][0]["detail"] == evil
         yield "eksik alanlar boş metin olur", bool(data) and data["records"][1]["reason"] == ""
         yield "dış kaynak yüklenmez", not re.search(r"""(src|href)\s*=\s*["']?(https?:)?//""", html)
+        arch = tmp / "arsiv"
+        arch.mkdir()
+        (arch / f"20261026T120000Z_yerel_{govlib.line_hash(lines[0])[:12]}.jsonl").write_text(lines[0] + "\n", encoding="utf-8")
+        yield "yayınlanmış satır iki kez sayılmaz", build_site.build(audit, P("panel_template"), out, arch) == (2, 2)
+        yield "canlı kayıt olmadan dilimlerden üretilir", build_site.build(tmp / "yok.jsonl", P("panel_template"), out, arch) == (1, 0)
         bad_template = tmp / "sablon.html"
         bad_template.write_text("<html></html>", encoding="utf-8")
         yield "yer tutucusuz şablon reddedilir", raises(lambda: build_site.build(audit, bad_template, tmp / "x.html"), ValueError)

@@ -674,7 +674,7 @@ $('#meta').replaceChildren('Denetim kaydı · salt-okunur · kaynak ', el('code'
 
 $('#footer').replaceChildren(
   el('p', {}, 'Yollar tek kaynaktan okunur: ', el('code', { text: DATA.paths_file }), ' → ',
-    el('code', { text: 'files.audit_log' }), ' = ', el('code', { text: DATA.source }),
+    el('code', { text: 'dirs.audit_archive + files.audit_log' }), ' = ', el('code', { text: DATA.source }),
     '. Ayrıntılarda proje kökü ', el('code', { text: '.' }), ' olarak kısaltılmıştır.'),
   el('p', {}, 'Bu sayfa salt-okunurdur: dosya değiştirmez, ağ isteği yapmaz. Veriyi yenilemek için ',
     el('code', { text: 'python ' + DATA.builder }), ' komutunu yeniden çalıştırın.'));
@@ -685,7 +685,7 @@ if (DATA.errors.length) {
     statusIcon(GROUP.onay),
     el('div', {},
       el('strong', { text: `${nf.format(DATA.errors.length)} satır okunamadı ve panele alınmadı.` }),
-      el('ul', {}, ...shown.map(e => el('li', { text: `satır ${e.line}: ${e.error}` }))),
+      el('ul', {}, ...shown.map(e => el('li', { text: `${e.line}: ${e.error}` }))),
       DATA.errors.length > shown.length ? el('div', { text: `… ve ${DATA.errors.length - shown.length} satır daha.` }) : null)));
 }
 
