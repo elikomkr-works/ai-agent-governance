@@ -31,10 +31,10 @@ P = govlib.path
 R = govlib.rel
 
 
-def run_hook(script, payload):
+def run_hook(script, payload, env=None):
     raw = payload if isinstance(payload, str) else json.dumps(payload)
     proc = subprocess.run([sys.executable, str(HOOKS / script)], input=raw.encode("utf-8"),
-                          capture_output=True, env=ENV, timeout=30)
+                          capture_output=True, env=env or ENV, timeout=30)
     assert proc.returncode == 0, f"{script} çıkış kodu {proc.returncode}: {proc.stderr.decode('utf-8', 'replace')}"
     out = proc.stdout.decode("utf-8").strip()
     return json.loads(out) if out else None
@@ -259,6 +259,74 @@ def audit_checks():
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def tool_turn(tid, name, inp, text, decision=None, is_error=True):
+    """Transcript'te bir araç çağrısı ve sonucu (Claude Code'un JSONL biçimi)."""
+    use = {"type": "assistant", "message": {"content": [{"type": "tool_use", "id": tid, "name": name, "input": inp}]}}
+    res = {"type": "user", "timestamp": "2026-10-26T10:00:00Z",
+           "message": {"content": [{"type": "tool_result", "tool_use_id": tid, "content": text, "is_error": is_error}]}}
+    if decision:
+        res["permissionDecision"] = decision
+    return json.dumps(use) + "\n" + json.dumps(res) + "\n"
+
+
+def denial_checks():
+    """İzin sistemi retlerinin (hook'a ulaşmayan) denetim kaydına düşmesi: (açıklama, sonuç)."""
+    tmp = Path(tempfile.mkdtemp(prefix="gov_denial_"))
+    try:
+        log, transcript = tmp / "audit.jsonl", tmp / "oturum.jsonl"
+        env = dict(ENV, GOV_AUDIT_LOG=str(log))
+        transcript.write_text("".join([
+            tool_turn("t1", "Edit", {"file_path": ".git/config"}, "File is in a directory that is denied by your permission settings.",
+                      {"decision": "reject", "source": "config", "reasonType": "rule", "reasonCode": "rule:projectSettings"}),
+            tool_turn("t2", "Bash", {"command": "rm -rf build"}, "Permission for this action was denied by the Claude Code auto mode classifier.",
+                      {"decision": "reject", "source": "config", "reasonType": "classifier", "reasonCode": "classifier:auto-mode"}),
+            tool_turn("t3", "Bash", {"command": "nmap 8.8.8.8"}, "PreToolUse:Bash hook error: [Policy Gate] DENY",
+                      {"decision": "reject", "source": "hook", "reasonCode": "hook:PreToolUse"}),
+            tool_turn("t4", "Bash", {"command": "ls"}, "a.txt", {"decision": "accept", "source": "config"}, is_error=False),
+            tool_turn("t5", "Write", {"file_path": "x.md"}, "The user doesn't want to proceed with this tool use."),
+            tool_turn("t6", "Bash", {"command": "false"}, "Exit code 1"),
+            "bozuk satır tool_result\n",
+        ]), encoding="utf-8")
+
+        def records():
+            if not log.exists():
+                return []
+            return [json.loads(ln) for ln in log.read_text(encoding="utf-8").splitlines()]
+
+        def ids():
+            return sorted(i for r in records() for i in re.findall(r"tool_use_id=(\S+)", r["detail"]))
+
+        stop = {"hook_event_name": "Stop", "session_id": "s1", "transcript_path": str(transcript)}
+        run_hook("denial_log.py", stop, env)
+        yield "deny kuralı, sınıflandırıcı ve kullanıcı retleri kaydedilir", ids() == ["t1", "t2", "t5"]
+        yield "Gate retleri, kabul edilenler ve sıradan hatalar kaydedilmez", len(records()) == 3
+        t1 = next((r for r in records() if "tool_use_id=t1 " in r["detail"]), {})
+        yield "kayıtta araç, girdi ve gerekçe kodu var", (
+            t1.get("event") == "Permission" and t1.get("decision") == "deny" and t1.get("tool") == "Edit"
+            and ".git/config" in t1.get("detail", "") and t1.get("reason", "").startswith("rule:projectSettings"))
+        run_hook("denial_log.py", stop, env)
+        yield "tekrar taramada aynı ret ikinci kez yazılmaz", len(records()) == 3
+        denied = {"hook_event_name": "PermissionDenied", "session_id": "s1", "tool_name": "Bash", "reason": "[Kural]"}
+        run_hook("denial_log.py", dict(denied, tool_use_id="t2", tool_input={"command": "x"}), env)
+        yield "PermissionDenied, taramada yazılan reddi tekrarlamaz", len(records()) == 3
+        run_hook("denial_log.py", dict(denied, tool_use_id="t9", tool_input={"command": "curl x"}), env)
+        last = records()[-1]
+        yield "PermissionDenied anında kaydedilir", "tool_use_id=t9" in last["detail"] and last["reason"].startswith("classifier:auto-mode")
+
+        sub = tmp / "agent-a1.jsonl"
+        sub.write_text(tool_turn("s7", "Edit", {"file_path": "knowledge/approved/a.md"}, "denied by your permission settings"),
+                       encoding="utf-8")
+        run_hook("denial_log.py", {"hook_event_name": "SubagentStop", "session_id": "s1", "agent_type": "log-analyst",
+                                   "transcript_path": str(transcript), "agent_transcript_path": str(sub)}, env)
+        last = records()[-1]
+        yield "alt agent retleri agent adıyla kaydedilir", "tool_use_id=s7" in last["detail"] and last["agent"] == "log-analyst"
+        yield "kayıtlar hash zincirini bozmaz", verify_audit.verify(log, tmp / "yok")[1] == []
+        out = run_hook("denial_log.py", {"hook_event_name": "Stop", "transcript_path": str(tmp / "yok.jsonl")}, env)
+        yield "transcript yoksa sessizce geçer", out is None
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def cloud_checks():
     """Bulut oturumu kuralları (CLAUDE_CODE_REMOTE=true): (açıklama, sonuç)."""
     cloud, local = {"CLAUDE_CODE_REMOTE": "true"}, {}
@@ -312,6 +380,8 @@ def settings_checks():
     yield "onaylı bilgiye yazma işletim sistemi düzeyinde yasak", f"Edit(/{R('approved')}**)" in deny
     # Sandbox dışında çalışan git, bu dosyalardaki betikleri çalıştırır.
     yield "git hook ve config yazımı yasak", {"Edit(/.git/hooks/**)", "Edit(/.git/config)"} <= set(deny)
+    yield "izin reddi kaydı hook'ları bağlı", all(
+        "denial_log.py" in json.dumps(settings.get("hooks", {}).get(e, [])) for e in ("Stop", "SubagentStop", "PermissionDenied"))
     excluded = {c.split()[1] for c in sandbox.get("excludedCommands", [])}
     yield "sandbox dışı git komutları Gate kuralıyla aynı", excluded == policy_gate.GIT_UNSANDBOXED
     # .gitignore'daki sandbox yer tutucuları yönetişim dosyalarını gizlememeli.
@@ -375,6 +445,10 @@ def main():
 
     print("== Denetim kaydı bütünlüğü ==")
     for label, ok in audit_checks():
+        report(ok, label)
+
+    print("== İzin reddi kaydı ==")
+    for label, ok in denial_checks():
         report(ok, label)
 
     print("== Sandbox ayarları ==")
