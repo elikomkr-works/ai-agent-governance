@@ -314,6 +314,12 @@ def settings_checks():
     yield "git hook ve config yazımı yasak", {"Edit(/.git/hooks/**)", "Edit(/.git/config)"} <= set(deny)
     excluded = {c.split()[1] for c in sandbox.get("excludedCommands", [])}
     yield "sandbox dışı git komutları Gate kuralıyla aynı", excluded == policy_gate.GIT_UNSANDBOXED
+    # .gitignore'daki sandbox yer tutucuları yönetişim dosyalarını gizlememeli.
+    governed = [".claude/settings.json", ".claude/hooks/policy_gate.py", ".claude/agents/reviewer.md",
+                R("audit_log"), R("policy"), R("reports") + "r.md", R("approved") + "a.md"]
+    ignored = [p for p in governed
+               if subprocess.run(["git", "check-ignore", "-q", "--no-index", p], cwd=ROOT).returncode == 0]
+    yield "sandbox yer tutucuları yönetişim dosyalarını gizlemez", ignored == []
 
 
 def main():
