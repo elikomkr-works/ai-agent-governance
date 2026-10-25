@@ -15,6 +15,7 @@ work/
 /.gitconfig
 /.gitmodules
 /.mcp.json
+/.ripgreprc
 /.idea
 /.vscode
 /.claude/commands
