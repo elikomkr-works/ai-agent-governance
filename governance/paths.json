@@ -3,6 +3,7 @@
   "_not": "Projedeki klasör ve dosya yollarının tek kaynağı. Yollar proje köküne göre, '/' ile yazılır ve proje dışına çıkamaz. Hook'lar, tools/ betikleri, testler ve panel yolları buradan okur; policy.json ve skills_registry.json bu anahtarlara '@anahtar' ile başvurur. Bu dosyanın kendi yeri (governance/paths.json) sabittir. .claude/ ve CLAUDE.md konumunu Claude Code belirlediği için burada yer almaz. Bu dosyayı yalnızca kullanıcı değiştirir.",
   "dirs": {
     "governance": "governance",
+    "audit_archive": "governance/audit_archive",
     "templates": "governance/templates",
     "tools": "tools",
     "tests": "tests",

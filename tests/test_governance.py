@@ -259,6 +259,62 @@ def audit_checks():
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def slice_checks():
+    """Dilimli denetim kaydı: publish_audit yazımı ve verify_audit dilim kontrolleri: (açıklama, sonuç)."""
+    import publish_audit
+    from datetime import datetime, timedelta, timezone
+    tmp = Path(tempfile.mkdtemp(prefix="gov_slice_"))
+    saved = os.environ.get("GOV_AUDIT_LOG")
+    t0 = datetime(2026, 10, 26, 12, 0, 0, tzinfo=timezone.utc)
+    try:
+        log, arch, approved = tmp / "audit.jsonl", tmp / "arsiv", tmp / "approved"
+        os.environ["GOV_AUDIT_LOG"] = str(log)
+        write = lambda n, tag: [govlib.audit("PreToolUse", "Bash", "pass", "", f"{tag} {i}", {"session_id": "s"}) for i in range(n)]
+
+        def check(base_raw=None, base_slices=None, live=log):
+            return verify_audit.verify(live, approved, base_raw, arch, base_slices)
+
+        write(3, "ilk")
+        legacy = log.read_bytes()
+        out1, n1, e1 = publish_audit.publish(log, arch, approved, "yerel", t0)
+        yield "ilk dilim tüm satırları alır", n1 == 3 and e1 == [] and verify_audit.SLICE_NAME.match(out1.name)
+        write(2, "ikinci")
+        out2, n2, _ = publish_audit.publish(log, arch, approved, "yerel", t0 + timedelta(seconds=1))
+        yield "ikinci dilim yalnızca yeni satırları alır", n2 == 2 and out2.read_bytes().count(b"\n") == 2
+        yield "yeni kayıt yoksa dilim yazılmaz", publish_audit.publish(log, arch, approved, "yerel", t0)[0] is None
+        n, errs = check()
+        yield "dilimler + canlı kayıt hatasız, satırlar bir kez sayılır", errs == [] and n == 5
+        yield "canlı kayıt olmadan (CI) dilimler hatasız", check(live=tmp / "yok.jsonl") == (5, [])
+        yield "eski izlenen kayıt dilimlerin başıysa geçer", check(base_raw=legacy, live=tmp / "yok.jsonl")[1] == []
+
+        base = {p.name: p.read_bytes() for p in arch.iterdir()}
+        out2.write_bytes(out2.read_bytes().replace(b"ikinci 0", b"ikinci X"))
+        yield "değiştirilen dilim bulunur (zincir)", bool(check()[1])
+        yield "değiştirilen dilim bulunur (taban)", any("değiştirilmiş" in e for e in check(base_slices=base)[1])
+        out2.write_bytes(base[out2.name])
+        out2.unlink()
+        yield "silinen dilim bulunur (taban)", any("silinmiş" in e for e in check(base_slices=base)[1])
+        out2.write_bytes(base[out2.name])
+        out1.rename(arch / out1.name.replace("120000Z", "115959Z").replace(out1.name[23:35], "0" * 12))
+        yield "logid ilk satırla eşleşmezse bulunur", any("logid" in e for e in check()[1])
+        (arch / out1.name).write_bytes(base[out1.name])
+        for p in arch.glob("*_000000000000.jsonl"):
+            p.unlink()
+        (arch / "rastgele.jsonl").write_text("{}\n", encoding="utf-8")
+        yield "biçimsiz dilim adı bulunur", any("biçime uymuyor" in e for e in check()[1])
+        (arch / "rastgele.jsonl").unlink()
+
+        log.write_bytes(log.read_bytes().replace(b"ilk 1", b"ilk Y"))
+        yield "yayınlanmış satırı değişen canlı kayıt bulunur", any("uyuşmuyor" in e for e in check()[1])
+        yield "hatalı canlı kayıt yayınlanmaz", publish_audit.publish(log, arch, approved, "yerel", t0 + timedelta(seconds=9))[0] is None
+    finally:
+        if saved is None:
+            os.environ.pop("GOV_AUDIT_LOG", None)
+        else:
+            os.environ["GOV_AUDIT_LOG"] = saved
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def tool_turn(tid, name, inp, text, decision=None, is_error=True):
     """Transcript'te bir araç çağrısı ve sonucu (Claude Code'un JSONL biçimi)."""
     use = {"type": "assistant", "message": {"content": [{"type": "tool_use", "id": tid, "name": name, "input": inp}]}}
@@ -445,6 +501,10 @@ def main():
 
     print("== Denetim kaydı bütünlüğü ==")
     for label, ok in audit_checks():
+        report(ok, label)
+
+    print("== Denetim kaydı dilimleri ==")
+    for label, ok in slice_checks():
         report(ok, label)
 
     print("== İzin reddi kaydı ==")
