@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "_not": "Projedeki klasör ve dosya yollarının tek kaynağı. Yollar proje köküne göre, '/' ile yazılır ve proje dışına çıkamaz. Hook'lar, tools/ betikleri, testler ve panel yolları buradan okur; policy.json ve skills_registry.json bu anahtarlara '@anahtar' ile başvurur. Bu dosyanın kendi yeri (governance/paths.json) sabittir. .claude/ ve CLAUDE.md konumunu Claude Code belirlediği için burada yer almaz. Bu dosyayı yalnızca kullanıcı değiştirir.",
+  "dirs": {
+    "governance": "governance",
+    "templates": "governance/templates",
+    "tools": "tools",
+    "tests": "tests",
+    "reports": "reports",
+    "quarantine": "knowledge/quarantine",
+    "approved": "knowledge/approved",
+    "samples": "samples",
+    "work": "work",
+    "proposals": "proposals",
+    "site": "site"
+  },
+  "files": {
+    "policy": "governance/policy.json",
+    "skills_registry": "governance/skills_registry.json",
+    "agents_registry": "governance/agents_registry.json",
+    "audit_log": "governance/audit.jsonl",
+    "report_template": "governance/templates/report.md",
+    "quarantine_template": "governance/templates/quarantine.md",
+    "approve_script": "tools/approve.py",
+    "panel_template": "tools/panel_template.html",
+    "site_index": "site/index.html"
+  }
+}

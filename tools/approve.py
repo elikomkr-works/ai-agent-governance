@@ -27,9 +27,9 @@ def main():
     args = parser.parse_args()
 
     src = Path(args.dosya).resolve()
-    quarantine = (ROOT / "knowledge" / "quarantine").resolve()
+    quarantine = govlib.path("quarantine").resolve()
     if src.parent != quarantine or not src.is_file():
-        sys.exit(f"Hata: dosya knowledge/quarantine/ içinde olmalı: {src}")
+        sys.exit(f"Hata: dosya {govlib.rel('quarantine')} içinde olmalı: {src}")
 
     text = src.read_text(encoding="utf-8")
     m = re.search(r"^durum:\s*(\S+)", text, re.M)
@@ -54,7 +54,7 @@ def main():
     # İlk "\n---" ön bilgi bloğunun kapanışıdır; onay alanlarını onun önüne ekle.
     text = text.replace("\n---", f"\n{extra}\n---", 1)
 
-    dest = ROOT / "knowledge" / "approved" / src.name
+    dest = govlib.path("approved") / src.name
     if dest.exists():
         sys.exit(f"Hata: {dest} zaten var; önce eskisini arşivleyin.")
     dest.parent.mkdir(parents=True, exist_ok=True)

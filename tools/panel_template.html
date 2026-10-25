@@ -1,0 +1,760 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:">
+<title>Yönetişim Paneli</title>
+<!-- Bu dosya tools/build_site.py için şablondur. Doğrudan açmayın; üretilen site/index.html'i açın. -->
+<style>
+:root {
+  color-scheme: light;
+  --page: #f9f9f7;
+  --surface: #fcfcfb;
+  --text: #0b0b0b;
+  --text-2: #52514e;
+  --muted: #898781;
+  --grid: #e1e0d9;
+  --axis: #c3c2b7;
+  --border: rgba(11, 11, 11, 0.10);
+  --wash: rgba(11, 11, 11, 0.045);
+  --focus: #2a78d6;
+  --shadow: 0 4px 16px rgba(11, 11, 11, 0.10);
+  --critical: #d03b3b;
+  --warning: #fab219;
+  --good: #0ca30c;
+  --neutral: #898781;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --page: #0d0d0d;
+    --surface: #1a1a19;
+    --text: #f0efec;
+    --text-2: #c3c2b7;
+    --grid: #2c2c2a;
+    --axis: #383835;
+    --border: rgba(255, 255, 255, 0.10);
+    --wash: rgba(255, 255, 255, 0.05);
+    --focus: #3987e5;
+    --shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page: #0d0d0d;
+  --surface: #1a1a19;
+  --text: #f0efec;
+  --text-2: #c3c2b7;
+  --grid: #2c2c2a;
+  --axis: #383835;
+  --border: rgba(255, 255, 255, 0.10);
+  --wash: rgba(255, 255, 255, 0.05);
+  --focus: #3987e5;
+  --shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--page);
+  color: var(--text);
+  font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+.wrap { max-width: 1200px; margin: 0 auto; padding: 24px 16px 48px; }
+code, .mono { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 12px; }
+button, select, input { font: inherit; font-size: 13px; color: var(--text); }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+header.top {
+  display: flex; flex-wrap: wrap; gap: 12px 24px;
+  align-items: flex-end; justify-content: space-between; margin-bottom: 20px;
+}
+h1 { font-size: 22px; font-weight: 600; margin: 0; letter-spacing: -0.01em; }
+.sub { margin: 2px 0 0; color: var(--text-2); font-size: 13px; overflow-wrap: anywhere; }
+
+.btn {
+  height: 32px; padding: 0 12px; border: 1px solid var(--border); border-radius: 8px;
+  background: var(--surface); cursor: pointer; white-space: nowrap;
+}
+.btn:hover { background: linear-gradient(var(--wash), var(--wash)), var(--surface); }
+.link-btn {
+  flex: none; border: 0; background: none; padding: 4px; cursor: pointer;
+  color: var(--text-2); font-size: 12px; text-decoration: underline; text-underline-offset: 2px;
+}
+
+.filters { display: flex; flex-wrap: wrap; gap: 10px 12px; align-items: flex-end; margin: 0 0 16px; }
+.field { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.field > span { font-size: 11px; color: var(--text-2); }
+.field select, .field input {
+  height: 32px; min-width: 0; max-width: 100%; padding: 0 8px;
+  border: 1px solid var(--border); border-radius: 8px; background: var(--surface);
+}
+.field input { width: 240px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip {
+  display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 10px 0 7px;
+  border: 1px solid var(--border); border-radius: 999px; background: var(--surface); cursor: pointer;
+}
+.chip:hover { background: linear-gradient(var(--wash), var(--wash)), var(--surface); }
+.chip[aria-pressed="false"] { opacity: 0.5; }
+.chip[aria-pressed="false"] .si { filter: grayscale(1); }
+.chip .n { color: var(--text-2); font-variant-numeric: tabular-nums; }
+
+.si {
+  display: inline-grid; place-items: center; flex: none; width: 16px; height: 16px; border-radius: 50%;
+  font-size: 10px; font-weight: 700; line-height: 1; color: #ffffff;
+}
+.si.critical { background: var(--critical); }
+.si.warning { background: var(--warning); color: #0b0b0b; }
+.si.good { background: var(--good); }
+.si.neutral { background: var(--neutral); }
+
+.alert {
+  display: flex; gap: 10px; align-items: flex-start; margin-bottom: 16px; padding: 10px 12px;
+  border: 1px solid var(--border); border-left: 3px solid var(--warning); border-radius: 8px;
+  background: var(--surface); font-size: 13px;
+}
+.alert ul { margin: 4px 0 0; padding-left: 18px; color: var(--text-2); overflow-wrap: anywhere; }
+
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 16px; }
+.tile { min-width: 0; padding: 14px 16px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
+.tile .label { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-2); }
+.tile .value { margin-top: 4px; font-size: 28px; font-weight: 600; line-height: 1.2; }
+.tile .note { margin-top: 2px; font-size: 12px; color: var(--text-2); overflow-wrap: anywhere; }
+
+.charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); gap: 12px; margin-bottom: 16px; }
+.card { min-width: 0; padding: 16px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
+.card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+h2 { margin: 0; font-size: 15px; font-weight: 600; }
+.card-head p { margin: 2px 0 0; font-size: 12px; color: var(--text-2); }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 0 0 8px; padding: 0; list-style: none; font-size: 12px; color: var(--text-2); }
+.legend li { display: inline-flex; align-items: center; gap: 6px; }
+.sw { width: 10px; height: 10px; border-radius: 2px; }
+.sw.critical, .key.critical { background: var(--critical); }
+.sw.warning, .key.warning { background: var(--warning); }
+.sw.good, .key.good { background: var(--good); }
+.sw.neutral, .key.neutral { background: var(--neutral); }
+
+.plot { position: relative; }
+.plot svg { display: block; overflow: visible; }
+.grid { stroke: var(--grid); stroke-width: 1; shape-rendering: crispEdges; }
+.axis { stroke: var(--axis); stroke-width: 1; shape-rendering: crispEdges; }
+.tick { fill: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.lbl { fill: var(--text-2); font-size: 12px; }
+.val { fill: var(--text-2); font-size: 12px; font-variant-numeric: tabular-nums; }
+.f-critical { fill: var(--critical); }
+.f-warning { fill: var(--warning); }
+.f-good { fill: var(--good); }
+.f-neutral { fill: var(--neutral); }
+.wash { fill: transparent; }
+.mark.hover .wash { fill: var(--wash); }
+.mark.hover .seg { filter: brightness(1.08); }
+.hit { fill: transparent; outline: none; }
+
+.tip {
+  position: absolute; z-index: 5; min-width: 180px; padding: 8px 10px; pointer-events: none;
+  border: 1px solid var(--border); border-radius: 8px; background: var(--surface); box-shadow: var(--shadow);
+  font-size: 12px;
+}
+.tip-title { margin-bottom: 4px; color: var(--text-2); }
+.tip-row { display: grid; grid-template-columns: 12px minmax(2ch, auto) 1fr; align-items: center; gap: 8px; }
+.tip-row strong { font-weight: 600; font-variant-numeric: tabular-nums; text-align: right; }
+.tip-row .t { color: var(--text-2); }
+.tip-total { margin-top: 4px; padding-top: 4px; border-top: 1px solid var(--grid); }
+.key { width: 12px; height: 2px; border-radius: 1px; }
+
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th { padding: 8px 10px; border-bottom: 1px solid var(--axis); color: var(--text-2); font-weight: 600; text-align: left; white-space: nowrap; }
+td { padding: 8px 10px; border-bottom: 1px solid var(--grid); vertical-align: top; }
+th.num, td.num { text-align: right; font-variant-numeric: tabular-nums; }
+.records { min-width: 760px; }
+.records td.time { white-space: nowrap; color: var(--text-2); font-variant-numeric: tabular-nums; }
+.records td.nowrap { white-space: nowrap; }
+.records tbody tr { cursor: pointer; }
+.records tbody tr:hover { background: var(--wash); }
+.records td.reason { min-width: 180px; max-width: 360px; }
+.records td.detail { min-width: 260px; max-width: 420px; }
+.badge { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.clamp { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; }
+.mono { white-space: pre-wrap; }
+tr.open .clamp { display: block; -webkit-line-clamp: unset; }
+.more-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-top: 12px; font-size: 13px; color: var(--text-2); }
+.empty { padding: 32px 8px; text-align: center; font-size: 13px; color: var(--text-2); }
+
+footer { margin-top: 24px; font-size: 12px; color: var(--text-2); overflow-wrap: anywhere; }
+footer p { margin: 0 0 4px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>Yönetişim Paneli</h1>
+      <p class="sub" id="meta"></p>
+    </div>
+    <button class="btn" id="theme" type="button"></button>
+  </header>
+
+  <div id="alerts"></div>
+
+  <section class="filters" aria-label="Filtreler">
+    <label class="field"><span>Zaman aralığı</span><select id="f-range"></select></label>
+    <label class="field"><span>Bileşen</span><select id="f-event"></select></label>
+    <label class="field"><span>Araç</span><select id="f-tool"></select></label>
+    <label class="field"><span>Ara</span><input id="f-q" type="search" placeholder="komut, dosya, gerekçe…" autocomplete="off"></label>
+    <div class="field"><span id="chips-label">Karar</span><div class="chips" id="f-groups" role="group" aria-labelledby="chips-label"></div></div>
+    <button class="btn" id="f-reset" type="button">Sıfırla</button>
+  </section>
+
+  <section class="kpis" id="kpis" aria-label="Özet"></section>
+
+  <section class="charts">
+    <article class="card">
+      <div class="card-head">
+        <div><h2>Zaman içinde kararlar</h2><p id="time-note"></p></div>
+        <button class="link-btn" type="button" data-toggle="time">Tablo görünümü</button>
+      </div>
+      <ul class="legend" data-legend></ul>
+      <div class="plot" id="time-plot"></div>
+      <div class="table-wrap" id="time-table" hidden></div>
+    </article>
+    <article class="card">
+      <div class="card-head">
+        <div><h2>Araçlara göre kararlar</h2><p id="tool-note"></p></div>
+        <button class="link-btn" type="button" data-toggle="tool">Tablo görünümü</button>
+      </div>
+      <ul class="legend" data-legend></ul>
+      <div class="plot" id="tool-plot"></div>
+      <div class="table-wrap" id="tool-table" hidden></div>
+    </article>
+  </section>
+
+  <section class="card" aria-labelledby="rec-title">
+    <div class="card-head">
+      <div><h2 id="rec-title">Kayıtlar</h2><p>Satıra tıklayınca gerekçenin ve ayrıntının tamamı açılır.</p></div>
+      <button class="link-btn" id="sort" type="button"></button>
+    </div>
+    <div class="table-wrap">
+      <table class="records">
+        <thead><tr><th>Zaman</th><th>Bileşen</th><th>Araç</th><th>Karar</th><th>Gerekçe</th><th>Ayrıntı</th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+    <div class="empty" id="rows-empty" hidden>Bu filtrelerle eşleşen kayıt yok.</div>
+    <div class="more-row"><span id="rows-count"></span><button class="btn" id="more" type="button">Daha fazla göster</button></div>
+  </section>
+
+  <footer id="footer"></footer>
+</div>
+
+<script type="application/json" id="panel-data">/*__PANEL_DATA__*/</script>
+<script>
+'use strict';
+// Kayıtlar güvenilmeyen veridir: DOM'a yalnızca textContent / metin düğümü olarak girer, HTML olarak asla.
+const DATA = JSON.parse(document.getElementById('panel-data').textContent);
+
+// Grafik ve özetlerde kararlar dört gruba toplanır; sıra yığın sırasıdır (tabandan yukarı).
+const GROUPS = [
+  { key: 'engel', label: 'Engellendi / reddedildi', tile: 'Engellendi', icon: '✕', tone: 'critical' },
+  { key: 'onay', label: 'Onay istendi', tile: 'Onay istendi', icon: '!', tone: 'warning' },
+  { key: 'kabul', label: 'Kabul / onaylandı', tile: 'Kabul edildi', icon: '✓', tone: 'good' },
+  { key: 'serbest', label: 'Geçti / diğer', tile: 'Geçti', icon: '–', tone: 'neutral' },
+];
+const GROUP = Object.fromEntries(GROUPS.map(g => [g.key, g]));
+const DECISIONS = {
+  deny: ['Engellendi', 'engel'], red: ['Reddedildi', 'engel'], ask: ['Onay istendi', 'onay'],
+  kabul: ['Kabul edildi', 'kabul'], onaylandi: ['Onaylandı', 'kabul'],
+  pass: ['Geçti', 'serbest'], iptal: ['İptal edildi', 'serbest'],
+};
+const EVENTS = { PreToolUse: 'Policy Gate', Validator: 'Validator', Approve: 'Onay betiği' };
+const RANGES = [
+  ['all', 'Tüm zamanlar', 0], ['1h', 'Son 1 saat', 36e5], ['24h', 'Son 24 saat', 864e5],
+  ['7d', 'Son 7 gün', 6048e5], ['30d', 'Son 30 gün', 2592e6],
+];
+const BUCKETS = [
+  [6e4, '1 dakika'], [3e5, '5 dakika'], [9e5, '15 dakika'], [36e5, '1 saat'], [108e5, '3 saat'],
+  [216e5, '6 saat'], [432e5, '12 saat'], [864e5, '1 gün'], [6048e5, '1 hafta'], [2592e6, '30 gün'],
+];
+const PAGE = 50, GAP = 2, RADIUS = 4;
+
+const nf = new Intl.NumberFormat('tr-TR');
+const pf = new Intl.NumberFormat('tr-TR', { style: 'percent', maximumFractionDigits: 0 });
+const cf = new Intl.NumberFormat('tr-TR', { notation: 'compact' });
+const dtFull = new Intl.DateTimeFormat('tr-TR', { dateStyle: 'short', timeStyle: 'medium' });
+const dtHM = new Intl.DateTimeFormat('tr-TR', { hour: '2-digit', minute: '2-digit' });
+const dtDM = new Intl.DateTimeFormat('tr-TR', { day: '2-digit', month: '2-digit' });
+const dtDMHM = new Intl.DateTimeFormat('tr-TR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+
+const $ = s => document.querySelector(s);
+
+function el(tag, props, ...kids) {
+  const n = document.createElement(tag);
+  for (const [k, v] of Object.entries(props || {})) {
+    if (v == null) continue;
+    if (k === 'class') n.className = v;
+    else if (k === 'text') n.textContent = v;
+    else n.setAttribute(k, v);
+  }
+  n.append(...kids.filter(k => k != null)); // dizgiler metin düğümü olur
+  return n;
+}
+
+function sv(tag, attrs, text) {
+  const n = document.createElementNS('http://www.w3.org/2000/svg', tag);
+  for (const [k, v] of Object.entries(attrs || {})) n.setAttribute(k, v);
+  if (text != null) n.textContent = text;
+  return n;
+}
+
+const statusIcon = g => el('span', { class: 'si ' + g.tone, 'aria-hidden': 'true', text: g.icon });
+const zero = () => Object.fromEntries(GROUPS.map(g => [g.key, 0]));
+
+// Ayrıntılardaki proje kökü (C:\..., C:/..., /c/...) '.' olarak kısaltılır.
+const ROOT_RE = (() => {
+  const fwd = DATA.root.replace(/\\/g, '/');
+  const forms = [fwd, fwd.replace(/^([A-Za-z]):/, (_, d) => '/' + d.toLowerCase())];
+  const esc = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\//g, '[\\\\/]');
+  return new RegExp(forms.map(esc).join('|'), 'gi');
+})();
+
+const records = DATA.records.map((r, i) => {
+  const d = DECISIONS[r.decision];
+  const t = Date.parse(r.ts);
+  return Object.assign({}, r, {
+    i,
+    t: Number.isNaN(t) ? null : t,
+    label: d ? d[0] : (r.decision || '—'),
+    group: d ? d[1] : 'serbest',
+    shown: r.detail.replace(ROOT_RE, '.'),
+    hay: [r.event, EVENTS[r.event], r.tool, r.decision, d && d[0], r.reason, r.detail]
+      .filter(Boolean).join(' ').toLocaleLowerCase('tr'),
+  });
+});
+
+const state = { range: 'all', event: '', tool: '', q: '', groups: new Set(GROUPS.map(g => g.key)), shown: PAGE, desc: true };
+
+function pick(ignoreGroups) {
+  const span = RANGES.find(r => r[0] === state.range)[2];
+  const since = Date.now() - span;
+  return records.filter(r =>
+    (!span || (r.t != null && r.t >= since)) &&
+    (!state.event || r.event === state.event) &&
+    (!state.tool || r.tool === state.tool) &&
+    (!state.q || r.hay.includes(state.q)) &&
+    (ignoreGroups || state.groups.has(r.group)));
+}
+
+function countGroups(rows) {
+  const c = zero();
+  for (const r of rows) c[r.group]++;
+  return c;
+}
+
+/* ---------- Özet kutucukları ---------- */
+
+function renderKpis(rows) {
+  const c = countGroups(rows);
+  const last = rows.reduce((m, r) => (r.t != null && r.t > m ? r.t : m), -Infinity);
+  const tiles = [el('div', { class: 'tile' },
+    el('div', { class: 'label', text: 'Kayıt' }),
+    el('div', { class: 'value', text: nf.format(rows.length) }),
+    el('div', { class: 'note', text: Number.isFinite(last) ? 'Son: ' + dtFull.format(last) : 'Kayıt yok' }))];
+  for (const g of GROUPS) {
+    tiles.push(el('div', { class: 'tile' },
+      el('div', { class: 'label' }, statusIcon(g), g.tile),
+      el('div', { class: 'value', text: nf.format(c[g.key]) }),
+      el('div', { class: 'note', text: rows.length ? 'Pay: ' + pf.format(c[g.key] / rows.length) : '—' })));
+  }
+  $('#kpis').replaceChildren(...tiles);
+}
+
+/* ---------- Grafik yardımcıları ---------- */
+
+function niceScale(max) {
+  if (max <= 0) return { top: 1, step: 1 };
+  const raw = max / 4, p = 10 ** Math.floor(Math.log10(raw));
+  const step = Math.max(1, [1, 2, 5, 10].map(k => k * p).find(s => s >= raw));
+  return { top: Math.ceil(max / step) * step, step };
+}
+
+// Yalnızca veri ucu yuvarlanır (4px); taban kenarı düz kalır.
+function barPath(x, y, w, h, round) {
+  if (round === 'top') {
+    const r = Math.min(RADIUS, w / 2, h);
+    return `M${x},${y + h}V${y + r}A${r},${r} 0 0 1 ${x + r},${y}H${x + w - r}A${r},${r} 0 0 1 ${x + w},${y + r}V${y + h}Z`;
+  }
+  if (round === 'right') {
+    const r = Math.min(RADIUS, h / 2, w);
+    return `M${x},${y}H${x + w - r}A${r},${r} 0 0 1 ${x + w},${y + r}V${y + h - r}A${r},${r} 0 0 1 ${x + w - r},${y + h}H${x}Z`;
+  }
+  return `M${x},${y}h${w}v${h}h${-w}Z`;
+}
+
+// Yığın dilimleri arasında 2px yüzey boşluğu bırakılır; toplam yükseklik değişmez.
+function stackColumn(g, c, x, w, y) {
+  const parts = GROUPS.filter(k => c[k.key] > 0);
+  let acc = 0;
+  parts.forEach((k, idx) => {
+    const yBase = y(acc);
+    acc += c[k.key];
+    const last = idx === parts.length - 1;
+    const top = Math.min(last ? y(acc) : y(acc) + GAP, yBase - 1);
+    g.append(sv('path', { class: 'seg f-' + k.tone, d: barPath(x, top, w, yBase - top, last ? 'top' : null) }));
+  });
+}
+
+function stackRow(g, c, yTop, h, x) {
+  const parts = GROUPS.filter(k => c[k.key] > 0);
+  let acc = 0;
+  parts.forEach((k, idx) => {
+    const xs = x(acc);
+    acc += c[k.key];
+    const last = idx === parts.length - 1;
+    const w = Math.max(1, (last ? x(acc) : x(acc) - GAP) - xs);
+    g.append(sv('path', { class: 'seg f-' + k.tone, d: barPath(xs, yTop, w, h, last ? 'right' : null) }));
+  });
+}
+
+function tipBody(title, c, total) {
+  return el('div', {},
+    el('div', { class: 'tip-title', text: title }),
+    ...GROUPS.map(g => el('div', { class: 'tip-row' },
+      el('span', { class: 'key ' + g.tone }), el('strong', { text: nf.format(c[g.key]) }), el('span', { class: 't', text: g.label }))),
+    el('div', { class: 'tip-row tip-total' },
+      el('span'), el('strong', { text: nf.format(total) }), el('span', { class: 't', text: 'Toplam' })));
+}
+
+function attachTip(plot, tip, mark, hit, body, anchor) {
+  const show = () => {
+    mark.classList.add('hover');
+    tip.replaceChildren(body());
+    tip.hidden = false;
+    const a = anchor(), tw = tip.offsetWidth, th = tip.offsetHeight;
+    let left = a.x + 12;
+    if (left + tw > plot.clientWidth) left = a.x - tw - 12;
+    tip.style.left = Math.max(0, left) + 'px';
+    tip.style.top = Math.max(0, Math.min(a.y - th / 2, plot.clientHeight - th)) + 'px';
+  };
+  const hide = () => { mark.classList.remove('hover'); tip.hidden = true; };
+  hit.addEventListener('pointerenter', show);
+  hit.addEventListener('focus', show);
+  hit.addEventListener('pointerleave', hide);
+  hit.addEventListener('blur', hide);
+}
+
+function renderMiniTable(box, head, rows) {
+  if (!rows.length) {
+    box.replaceChildren(el('div', { class: 'empty', text: 'Gösterilecek veri yok.' }));
+    return;
+  }
+  box.replaceChildren(el('table', {},
+    el('thead', {}, el('tr', {},
+      el('th', { text: head }),
+      ...GROUPS.map(g => el('th', { class: 'num', text: g.tile })),
+      el('th', { class: 'num', text: 'Toplam' }))),
+    el('tbody', {}, ...rows.map(([name, c, total]) => el('tr', {},
+      el('td', { text: name }),
+      ...GROUPS.map(g => el('td', { class: 'num', text: nf.format(c[g.key]) })),
+      el('td', { class: 'num', text: nf.format(total) }))))));
+}
+
+/* ---------- Zaman içinde kararlar ---------- */
+
+function timeBuckets(rows) {
+  const timed = rows.filter(r => r.t != null);
+  if (!timed.length) return null;
+  let lo = Infinity, hi = -Infinity;
+  for (const r of timed) { lo = Math.min(lo, r.t); hi = Math.max(hi, r.t); }
+  const [size, name] = BUCKETS.find(([s]) => (hi - lo) / s < 48) || BUCKETS[BUCKETS.length - 1];
+  const off = new Date(lo).getTimezoneOffset() * 6e4; // dilimler yerel saate hizalanır
+  const floor = t => Math.floor((t - off) / size) * size + off;
+  const start = floor(lo);
+  const buckets = Array.from({ length: Math.round((floor(hi) - start) / size) + 1 },
+    (_, k) => ({ t: start + k * size, c: zero(), total: 0 }));
+  for (const r of timed) {
+    const b = buckets[Math.round((floor(r.t) - start) / size)];
+    b.c[r.group]++;
+    b.total++;
+  }
+  return { size, name, buckets };
+}
+
+function bucketLabel(t, size) {
+  if (size < 864e5) return `${dtDMHM.format(t)} – ${dtHM.format(t + size)}`;
+  return size === 864e5 ? dtDM.format(t) : `${dtDM.format(t)} – ${dtDM.format(t + size - 1)}`;
+}
+
+function drawTime(rows) {
+  const plot = $('#time-plot');
+  const s = timeBuckets(rows);
+  $('#time-note').textContent = s ? `Dilim: ${s.name} · ${nf.format(s.buckets.length)} dilim` : '';
+  renderMiniTable($('#time-table'), 'Zaman dilimi',
+    s ? s.buckets.filter(b => b.total).map(b => [bucketLabel(b.t, s.size), b.c, b.total]) : []);
+  if (!s) {
+    plot.replaceChildren(el('div', { class: 'empty', text: 'Bu filtrelerle zamanı okunabilen kayıt yok.' }));
+    return;
+  }
+  if (plot.hidden) return;
+
+  const W = Math.max(260, plot.clientWidth), H = 240, m = { t: 10, r: 8, b: 26, l: 36 };
+  const pw = W - m.l - m.r, ph = H - m.t - m.b;
+  const max = Math.max(...s.buckets.map(b => b.total));
+  const { top, step } = niceScale(max);
+  const y = v => m.t + ph - (v / top) * ph;
+  const tip = el('div', { class: 'tip', hidden: '' });
+  const root = sv('svg', {
+    width: W, height: H, viewBox: `0 0 ${W} ${H}`, role: 'img',
+    'aria-label': `Zaman içinde kararlar: ${s.buckets.length} dilim, en yoğun dilimde ${max} kayıt. Değerler tablo görünümünde de var.`,
+  });
+
+  for (let v = 0; v <= top; v += step) {
+    root.append(sv('line', { class: v ? 'grid' : 'axis', x1: m.l, x2: W - m.r, y1: y(v), y2: y(v) }));
+    root.append(sv('text', { class: 'tick', x: m.l - 6, y: y(v), dy: '0.32em', 'text-anchor': 'end' }, cf.format(v)));
+  }
+
+  const n = s.buckets.length, band = pw / n, bw = Math.max(2, Math.min(24, band * 0.72));
+  s.buckets.forEach((b, k) => {
+    const x0 = m.l + band * k, cx = x0 + band / 2;
+    const mark = sv('g', { class: 'mark' });
+    mark.append(sv('rect', { class: 'wash', x: x0, y: m.t, width: band, height: ph }));
+    if (b.total) stackColumn(mark, b.c, cx - bw / 2, bw, y);
+    const hit = sv('rect', { class: 'hit', x: x0, y: m.t, width: band, height: ph });
+    if (b.total) {
+      hit.setAttribute('tabindex', '0');
+      hit.setAttribute('aria-label', `${bucketLabel(b.t, s.size)}: ${b.total} kayıt`);
+    }
+    mark.append(hit);
+    attachTip(plot, tip, mark, hit, () => tipBody(bucketLabel(b.t, s.size), b.c, b.total), () => ({ x: cx, y: y(b.total) }));
+    root.append(mark);
+  });
+
+  const dayOf = t => dtDM.format(t);
+  const multiDay = dayOf(s.buckets[0].t) !== dayOf(s.buckets[n - 1].t);
+  const fmt = s.size >= 864e5 ? dtDM : (multiDay ? dtDMHM : dtHM);
+  const every = Math.max(1, Math.ceil((fmt === dtDMHM ? 84 : 52) / band));
+  for (let k = 0; k < n; k += every) {
+    root.append(sv('text', { class: 'tick', x: m.l + band * k + band / 2, y: H - 8, 'text-anchor': 'middle' }, fmt.format(s.buckets[k].t)));
+  }
+  plot.replaceChildren(root, tip);
+}
+
+/* ---------- Araçlara göre kararlar ---------- */
+
+function drawTools(rows) {
+  const plot = $('#tool-plot');
+  const byTool = new Map();
+  for (const r of rows) {
+    const name = r.tool || '—';
+    if (!byTool.has(name)) byTool.set(name, { name, c: zero(), total: 0 });
+    const e = byTool.get(name);
+    e.c[r.group]++;
+    e.total++;
+  }
+  const all = [...byTool.values()].sort((a, b) => b.total - a.total || a.name.localeCompare(b.name, 'tr'));
+  $('#tool-note').textContent = all.length ? `${nf.format(all.length)} araç` : '';
+  renderMiniTable($('#tool-table'), 'Araç', all.map(e => [e.name, e.c, e.total]));
+  if (!all.length) {
+    plot.replaceChildren(el('div', { class: 'empty', text: 'Bu filtrelerle eşleşen kayıt yok.' }));
+    return;
+  }
+  if (plot.hidden) return;
+
+  // En çok 8 satır: kalan araçlar "Diğer" satırında toplanır (tablo görünümünde hepsi ayrı ayrı var).
+  let list = all;
+  if (all.length > 8) {
+    const rest = all.slice(7), other = { name: `Diğer (${rest.length} araç)`, c: zero(), total: 0 };
+    for (const e of rest) {
+      for (const g of GROUPS) other.c[g.key] += e.c[g.key];
+      other.total += e.total;
+    }
+    list = all.slice(0, 7).concat(other);
+  }
+
+  const W = Math.max(260, plot.clientWidth), rowH = 30, bh = 14, m = { t: 4, r: 44, b: 4, l: 118 };
+  const H = m.t + m.b + rowH * list.length, pw = W - m.l - m.r;
+  const max = Math.max(...list.map(e => e.total));
+  const x = v => m.l + (v / max) * pw;
+  const tip = el('div', { class: 'tip', hidden: '' });
+  const root = sv('svg', {
+    width: W, height: H, viewBox: `0 0 ${W} ${H}`, role: 'img',
+    'aria-label': `Araçlara göre kararlar: ${list.length} satır. Değerler tablo görünümünde de var.`,
+  });
+
+  list.forEach((e, k) => {
+    const y0 = m.t + rowH * k;
+    const mark = sv('g', { class: 'mark' });
+    mark.append(sv('rect', { class: 'wash', x: 0, y: y0, width: W, height: rowH }));
+    const name = e.name.length > 16 ? e.name.slice(0, 15) + '…' : e.name;
+    mark.append(sv('text', { class: 'lbl', x: m.l - 8, y: y0 + rowH / 2, dy: '0.32em', 'text-anchor': 'end' }, name));
+    stackRow(mark, e.c, y0 + (rowH - bh) / 2, bh, x);
+    mark.append(sv('text', { class: 'val', x: x(e.total) + 6, y: y0 + rowH / 2, dy: '0.32em' }, nf.format(e.total)));
+    const hit = sv('rect', { class: 'hit', x: 0, y: y0, width: W, height: rowH, tabindex: '0', 'aria-label': `${e.name}: ${e.total} kayıt` });
+    mark.append(hit);
+    attachTip(plot, tip, mark, hit, () => tipBody(e.name, e.c, e.total), () => ({ x: x(e.total), y: y0 + rowH / 2 }));
+    root.append(mark);
+  });
+  root.append(sv('line', { class: 'axis', x1: m.l, x2: m.l, y1: m.t, y2: H - m.b }));
+  plot.replaceChildren(root, tip);
+}
+
+/* ---------- Kayıt tablosu ---------- */
+
+function renderRows(rows) {
+  const sorted = rows.slice().sort((a, b) => (state.desc ? b.i - a.i : a.i - b.i));
+  const page = sorted.slice(0, state.shown);
+  $('#rows').replaceChildren(...page.map(r => {
+    const g = GROUP[r.group];
+    const tr = el('tr', { tabindex: '0', 'aria-expanded': 'false' },
+      el('td', { class: 'time', text: r.t != null ? dtFull.format(r.t) : (r.ts || '—') }),
+      el('td', { class: 'nowrap', text: EVENTS[r.event] || r.event || '—', title: r.event }),
+      el('td', { text: r.tool || '—' }),
+      el('td', {}, el('span', { class: 'badge' }, statusIcon(g), r.label)),
+      el('td', { class: 'reason' }, el('div', { class: 'clamp', text: r.reason || '—' })),
+      el('td', { class: 'detail' }, el('div', { class: 'clamp mono', text: r.shown || '—' })));
+    const toggle = () => tr.setAttribute('aria-expanded', String(tr.classList.toggle('open')));
+    tr.addEventListener('click', toggle);
+    tr.addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); }
+    });
+    return tr;
+  }));
+  $('#rows-empty').hidden = rows.length > 0;
+  $('#rows-count').textContent = rows.length ? `${nf.format(page.length)} / ${nf.format(rows.length)} kayıt gösteriliyor` : '';
+  $('#more').hidden = page.length >= rows.length;
+  $('#sort').textContent = state.desc ? 'Sıralama: en yeni önce' : 'Sıralama: en eski önce';
+}
+
+/* ---------- Kurulum ---------- */
+
+function tally(key) {
+  const m = new Map();
+  for (const r of records) m.set(r[key], (m.get(r[key]) || 0) + 1);
+  return [...m].sort((a, b) => b[1] - a[1]);
+}
+
+$('#f-range').replaceChildren(...RANGES.map(([v, label]) => el('option', { value: v, text: label })));
+$('#f-event').replaceChildren(el('option', { value: '', text: 'Tümü' }),
+  ...tally('event').map(([v, n]) => el('option', { value: v, text: `${EVENTS[v] || v || '—'} (${nf.format(n)})` })));
+$('#f-tool').replaceChildren(el('option', { value: '', text: 'Tümü' }),
+  ...tally('tool').map(([v, n]) => el('option', { value: v, text: `${v || '—'} (${nf.format(n)})` })));
+
+const chips = GROUPS.map(g => {
+  const n = el('span', { class: 'n' });
+  const b = el('button', { class: 'chip', type: 'button', 'aria-pressed': 'true' }, statusIcon(g), el('span', { text: g.tile }), n);
+  b.addEventListener('click', () => {
+    if (state.groups.has(g.key)) state.groups.delete(g.key);
+    else state.groups.add(g.key);
+    state.shown = PAGE;
+    render();
+  });
+  return { g, b, n };
+});
+$('#f-groups').replaceChildren(...chips.map(c => c.b));
+
+for (const ul of document.querySelectorAll('[data-legend]')) {
+  ul.replaceChildren(...GROUPS.map(g => el('li', {}, el('span', { class: 'sw ' + g.tone, 'aria-hidden': 'true' }), g.label)));
+}
+
+$('#meta').replaceChildren('Denetim kaydı · salt-okunur · kaynak ', el('code', { text: DATA.source }),
+  ` · ${nf.format(records.length)} kayıt · oluşturuldu ${dtFull.format(new Date(DATA.generated_at))}`);
+
+$('#footer').replaceChildren(
+  el('p', {}, 'Yollar tek kaynaktan okunur: ', el('code', { text: DATA.paths_file }), ' → ',
+    el('code', { text: 'files.audit_log' }), ' = ', el('code', { text: DATA.source }),
+    '. Ayrıntılarda proje kökü ', el('code', { text: '.' }), ' olarak kısaltılmıştır.'),
+  el('p', {}, 'Bu sayfa salt-okunurdur: dosya değiştirmez, ağ isteği yapmaz. Veriyi yenilemek için ',
+    el('code', { text: 'python ' + DATA.builder }), ' komutunu yeniden çalıştırın.'));
+
+if (DATA.errors.length) {
+  const shown = DATA.errors.slice(0, 5);
+  $('#alerts').replaceChildren(el('div', { class: 'alert', role: 'status' },
+    statusIcon(GROUP.onay),
+    el('div', {},
+      el('strong', { text: `${nf.format(DATA.errors.length)} satır okunamadı ve panele alınmadı.` }),
+      el('ul', {}, ...shown.map(e => el('li', { text: `satır ${e.line}: ${e.error}` }))),
+      DATA.errors.length > shown.length ? el('div', { text: `… ve ${DATA.errors.length - shown.length} satır daha.` }) : null)));
+}
+
+function render() {
+  const rows = pick(false);
+  const counts = countGroups(pick(true));
+  for (const { g, b, n } of chips) {
+    b.setAttribute('aria-pressed', String(state.groups.has(g.key)));
+    n.textContent = nf.format(counts[g.key]);
+  }
+  renderKpis(rows);
+  drawTime(rows);
+  drawTools(rows);
+  renderRows(rows);
+}
+
+function onFilter(sel, key) {
+  $(sel).addEventListener('change', e => { state[key] = e.target.value; state.shown = PAGE; render(); });
+}
+onFilter('#f-range', 'range');
+onFilter('#f-event', 'event');
+onFilter('#f-tool', 'tool');
+
+let qTimer;
+$('#f-q').addEventListener('input', e => {
+  clearTimeout(qTimer);
+  qTimer = setTimeout(() => { state.q = e.target.value.trim().toLocaleLowerCase('tr'); state.shown = PAGE; render(); }, 150);
+});
+
+$('#f-reset').addEventListener('click', () => {
+  Object.assign(state, { range: 'all', event: '', tool: '', q: '', groups: new Set(GROUPS.map(g => g.key)), shown: PAGE });
+  $('#f-range').value = 'all';
+  $('#f-event').value = '';
+  $('#f-tool').value = '';
+  $('#f-q').value = '';
+  render();
+});
+
+$('#more').addEventListener('click', () => { state.shown += PAGE; renderRows(pick(false)); });
+$('#sort').addEventListener('click', () => { state.desc = !state.desc; renderRows(pick(false)); });
+
+for (const btn of document.querySelectorAll('[data-toggle]')) {
+  btn.addEventListener('click', () => {
+    const plot = $(`#${btn.dataset.toggle}-plot`), table = $(`#${btn.dataset.toggle}-table`);
+    const toTable = table.hidden;
+    table.hidden = !toTable;
+    plot.hidden = toTable;
+    btn.textContent = toTable ? 'Grafik görünümü' : 'Tablo görünümü';
+    render();
+  });
+}
+
+const THEMES = { auto: 'Tema: sistem', light: 'Tema: açık', dark: 'Tema: koyu' };
+let theme = 'auto';
+try { theme = localStorage.getItem('panel-theme') || 'auto'; } catch (e) { /* depolama kapalı olabilir */ }
+if (!(theme in THEMES)) theme = 'auto';
+function applyTheme() {
+  if (theme === 'auto') delete document.documentElement.dataset.theme;
+  else document.documentElement.dataset.theme = theme;
+  $('#theme').textContent = THEMES[theme];
+}
+$('#theme').addEventListener('click', () => {
+  const order = Object.keys(THEMES);
+  theme = order[(order.indexOf(theme) + 1) % order.length];
+  try { localStorage.setItem('panel-theme', theme); } catch (e) { /* depolama kapalı olabilir */ }
+  applyTheme();
+});
+applyTheme();
+
+let lastWidth = 0, resizeTimer;
+new ResizeObserver(() => {
+  const w = $('.charts').clientWidth;
+  if (w === lastWidth) return;
+  lastWidth = w;
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => { const rows = pick(false); drawTime(rows); drawTools(rows); }, 100);
+}).observe($('.charts'));
+
+render();
+</script>
+</body>
+</html>

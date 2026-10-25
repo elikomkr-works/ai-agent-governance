@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "_not": "Skill Router yalnızca bu listedeki skill'leri seçer. Listede olmayan skill çağrısı Policy Gate tarafından kullanıcı onayına düşer.",
+  "_not": "Skill Router yalnızca bu listedeki skill'leri seçer. Listede olmayan skill çağrısı Policy Gate tarafından kullanıcı onayına düşer. 'cikti' alanındaki '@anahtar' governance/paths.json'daki klasördür.",
   "skills": [
     {
       "name": "log-analysis",
@@ -9,7 +9,7 @@
       "gerekli_girdi": ["log dosyasının yerel yolu"],
       "ag_erisimi": false,
       "risk": "dusuk",
-      "cikti": "reports/"
+      "cikti": "@reports"
     },
     {
       "name": "config-audit",
@@ -18,7 +18,7 @@
       "gerekli_girdi": ["yapılandırma dosyasının yerel yolu"],
       "ag_erisimi": false,
       "risk": "dusuk",
-      "cikti": "reports/"
+      "cikti": "@reports"
     },
     {
       "name": "cve-research",
@@ -27,7 +27,7 @@
       "gerekli_girdi": ["CVE kimliği veya ürün/sürüm"],
       "ag_erisimi": true,
       "risk": "orta",
-      "cikti": "knowledge/quarantine/"
+      "cikti": "@quarantine"
     }
   ]
 }
