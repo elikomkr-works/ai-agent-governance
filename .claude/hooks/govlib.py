@@ -171,6 +171,7 @@ def audit(event, tool, decision, reason, detail="", hook_data=None):
         prev = last_line(f)
         record["prev"] = line_hash(prev) if prev else GENESIS
         f.write((json.dumps(record, ensure_ascii=False) + "\n").encode("utf-8"))
+        f.flush()  # kilit bırakılmadan diske yaz; yoksa yazım kapanışa kalır ve zincir çatallanır
 
 
 def rel_path(p):

@@ -245,10 +245,10 @@ def audit_checks():
 
         par = tmp / "paralel.jsonl"
         env = dict(os.environ, GOV_AUDIT_LOG=str(par))
-        procs = [subprocess.Popen([sys.executable, "-c", CONCURRENT_WRITER, str(HOOKS), "25"], env=env) for _ in range(6)]
-        codes = [p.wait(timeout=60) for p in procs]
+        procs = [subprocess.Popen([sys.executable, "-c", CONCURRENT_WRITER, str(HOOKS), "50"], env=env) for _ in range(8)]
+        codes = [p.wait(timeout=120) for p in procs]
         n, errs = verify_audit.verify(par, approved / "yok")
-        yield "paralel yazan 6 süreç zinciri çatallamaz", codes == [0] * 6 and n == 150 and errs == []
+        yield "paralel yazan 8 süreç zinciri çatallamaz", codes == [0] * 8 and n == 400 and errs == []
     finally:
         if saved is None:
             os.environ.pop("GOV_AUDIT_LOG", None)
