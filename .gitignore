@@ -3,3 +3,5 @@ __pycache__/
 .claude/settings.local.json
 # tools/build_site.py çıktısı; denetim kaydından her seferinde yeniden üretilir.
 site/
+# Agent çalışma panoları; geçici, sürüm kontrolü dışında.
+work/
