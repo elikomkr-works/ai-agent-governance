@@ -25,6 +25,8 @@ import build_site  # noqa: E402
 import verify_audit  # noqa: E402
 
 ENV = dict(os.environ, GOV_AUDIT_LOG=str(Path(tempfile.gettempdir()) / "gov_test_audit.jsonl"))
+# Hook vakaları yerel davranışı sınar; bulut kuralları cloud_checks() içinde ayrıca sınanır.
+ENV.pop("CLAUDE_CODE_REMOTE", None)
 P = govlib.path
 R = govlib.rel
 
@@ -257,6 +259,30 @@ def audit_checks():
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def cloud_checks():
+    """Bulut oturumu kuralları (CLAUDE_CODE_REMOTE=true): (açıklama, sonuç)."""
+    cloud, local = {"CLAUDE_CODE_REMOTE": "true"}, {}
+    have = lambda dep: f"/usr/bin/{dep}"  # noqa: E731
+    lack_bwrap = lambda dep: None if dep == "bwrap" else f"/usr/bin/{dep}"  # noqa: E731
+
+    def decide(tool, env, which, **tool_input):
+        v = policy_gate.evaluate({"tool_name": tool, "tool_input": tool_input}, govlib.load_policy(),
+                                 govlib.registered_skills(), govlib.rel_path, govlib.registered_agents())
+        return policy_gate.apply_cloud_rules(v, tool, env, which).decision
+
+    yield "bulutta ASK reddedilir", decide("Bash", cloud, have, command="curl https://example.com") == "deny"
+    yield "bulutta kayıt dışı skill reddedilir", decide("Skill", cloud, have, skill="random-skill") == "deny"
+    yield "yerelde ASK onaya düşmeye devam eder", decide("Bash", local, have, command="curl https://example.com") == "ask"
+    yield "bulutta sandbox paketi yoksa kabuk reddedilir", decide("Bash", cloud, lack_bwrap, command="ls") == "deny"
+    yield "bulutta sandbox paketleri varsa zararsız komut geçer", decide("Bash", cloud, have, command="ls") == "pass"
+    yield "sandbox paketi kontrolü yalnızca kabuk araçlarına uygulanır", decide(
+        "Read", cloud, lack_bwrap, file_path=str(P("samples") / "auth.log")) == "pass"
+    yield "yerelde sandbox paketi aranmaz", decide("Bash", local, lack_bwrap, command="ls") == "pass"
+    setup = (P("tools") / "cloud_setup.sh").read_text(encoding="utf-8")
+    yield "kurulum betiği bubblewrap ve socat kurar", "bubblewrap" in setup and "socat" in setup
+    yield "kurulum betiği her durumda 0 ile çıkar", setup.rstrip().endswith("exit 0")
+
+
 def settings_checks():
     """.claude/settings.json: sandbox ve yazma yasakları paths.json ile uyumlu mu: (açıklama, sonuç)."""
     settings = govlib.load_json(ROOT / ".claude" / "settings.json")
@@ -326,6 +352,10 @@ def main():
 
     print("== Sandbox ayarları ==")
     for label, ok in settings_checks():
+        report(ok, label)
+
+    print("== Bulut oturumu ==")
+    for label, ok in cloud_checks():
         report(ok, label)
 
     print(f"\nSonuç: {failures} başarısız" if failures else "\nSonuç: tüm testler geçti")
