@@ -1,0 +1,34 @@
+{
+  "version": 1,
+  "approver": "kullanici",
+  "scope": {
+    "_not": "Yalnızca sahibi olduğunuz veya yazılı izinle test ettiğiniz hedefler. Bu listeyi yalnızca kullanıcı değiştirir.",
+    "allowed_targets": ["localhost", "127.0.0.1", "::1"]
+  },
+  "active_scanners": [
+    "nmap", "masscan", "zmap", "nikto", "nuclei", "nc", "ncat", "netcat",
+    "test-netconnection", "tnc", "hping3", "gobuster", "ffuf", "dirb"
+  ],
+  "diagnostic_tools": ["ping", "tracert", "traceroute", "pathping", "mtr"],
+  "http_clients": ["curl", "wget", "invoke-webrequest", "iwr", "invoke-restmethod", "irm"],
+  "forbidden_tools": [
+    "hydra", "medusa", "sqlmap", "msfconsole", "msfvenom", "mimikatz", "john", "hashcat",
+    "responder", "crackmapexec", "netexec", "nxc", "impacket", "evil-winrm", "beef"
+  ],
+  "destructive_patterns": [
+    "\\brm\\s+-[a-z]*r[a-z]*f", "\\brm\\s+-[a-z]*f[a-z]*r", "remove-item\\b.*-recurse",
+    "\\bformat\\s+[a-z]:", "\\bdel\\s+/s", "\\brd\\s+/s", "\\brmdir\\s+/s",
+    "git\\s+push\\b.*--force", "git\\s+reset\\s+--hard", "\\bstop-process\\b", "\\btaskkill\\b",
+    "\\bshutdown\\b", "\\breg\\s+(delete|add)\\b", "set-executionpolicy", "netsh\\s+advfirewall",
+    "set-mppreference", "\\bschtasks\\s+/create", "new-service", "\\bsc\\s+(create|delete|config)\\b"
+  ],
+  "sensitive_patterns": [
+    "(^|/)\\.env(\\.|$)", "id_rsa", "id_ed25519", "\\.pem$", "\\.key$", "\\.kdbx$", "\\.pfx$",
+    "credentials", "(^|/)secrets?(\\.|/|$)", "sam$", "ntds\\.dit"
+  ],
+  "paths": {
+    "deny_write": ["knowledge/approved/", "governance/audit.jsonl"],
+    "ask_write": ["governance/", ".claude/", "claude.md", "tools/"]
+  },
+  "deny_commands": ["\\bapprove\\.py\\b"]
+}

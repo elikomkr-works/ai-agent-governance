@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "_not": "Skill Router yalnızca bu listedeki skill'leri seçer. Listede olmayan skill çağrısı Policy Gate tarafından kullanıcı onayına düşer.",
+  "skills": [
+    {
+      "name": "log-analysis",
+      "amac": "Yerel log dosyalarında saldırı izlerini bulmak ve kanıtlı rapor yazmak",
+      "tetikleyiciler": ["log", "auth.log", "brute-force", "şüpheli giriş", "olay kaydı"],
+      "gerekli_girdi": ["log dosyasının yerel yolu"],
+      "ag_erisimi": false,
+      "risk": "dusuk",
+      "cikti": "reports/"
+    },
+    {
+      "name": "config-audit",
+      "amac": "Yapılandırma dosyalarını güvenlik kontrol listesine göre salt-okunur denetlemek",
+      "tetikleyiciler": ["sshd_config", "yapılandırma", "config", "sertleştirme", "hardening"],
+      "gerekli_girdi": ["yapılandırma dosyasının yerel yolu"],
+      "ag_erisimi": false,
+      "risk": "dusuk",
+      "cikti": "reports/"
+    },
+    {
+      "name": "cve-research",
+      "amac": "CVE/güvenlik açığı bilgisini birincil kaynaklardan toplayıp karantinaya kaydetmek",
+      "tetikleyiciler": ["CVE", "güvenlik açığı", "zafiyet", "advisory", "yama"],
+      "gerekli_girdi": ["CVE kimliği veya ürün/sürüm"],
+      "ag_erisimi": true,
+      "risk": "orta",
+      "cikti": "knowledge/quarantine/"
+    }
+  ]
+}

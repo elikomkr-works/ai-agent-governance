@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "_not": "Baş Agent yalnızca bu listedeki agent'ları çağırır. Listede olmayan agent çağrısı Policy Gate tarafından kullanıcı onayına düşer. Sayı sınırı yoktur; aynı agent'tan paralel birden çok kopya açılabilir.",
+  "head": {
+    "name": "bas-agent",
+    "rol": "Ana oturum. Görevi böler, uzmanlara dağıtır, yardım isteklerini yönlendirir, sonuçları denetçiye kontrol ettirir ve kullanıcıya sunar."
+  },
+  "agents": [
+    {"name": "skill-scout", "rol": "Yetenek Kaşifi — görev → skill/agent/araç eşleştirmesi, skill boşluğu tespiti", "skills": [], "yazar": []},
+    {"name": "log-analyst", "rol": "Log Analisti", "skills": ["log-analysis"], "yazar": ["reports/", "work/"]},
+    {"name": "config-auditor", "rol": "Yapılandırma Denetçisi", "skills": ["config-audit"], "yazar": ["reports/", "work/"]},
+    {"name": "cve-researcher", "rol": "CVE Araştırmacısı", "skills": ["cve-research"], "yazar": ["knowledge/quarantine/", "work/"]},
+    {"name": "reviewer", "rol": "Bağımsız Denetçi — içerik doğruluğu, yeniden sayım", "skills": [], "yazar": []},
+    {"name": "skill-smith", "rol": "Skill Ustası — yeni skill/agent taslakları", "skills": [], "yazar": ["proposals/"]},
+    {"name": "Explore", "rol": "Yerleşik salt-okunur arama agent'ı", "skills": [], "yazar": []},
+    {"name": "Plan", "rol": "Yerleşik planlama agent'ı", "skills": [], "yazar": []}
+  ]
+}

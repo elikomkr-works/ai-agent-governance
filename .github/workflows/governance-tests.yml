@@ -1,0 +1,21 @@
+name: governance-tests
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Hook testleri
+        run: python3 tests/test_governance.py
+      - name: Başlatıcı Linux'ta Python buluyor mu
+        run: |
+          echo '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"nmap 8.8.8.8"}}' \
+            | bash .claude/hooks/run.sh policy_gate.py | grep -q '"deny"'

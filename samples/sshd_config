@@ -1,0 +1,12 @@
+# Örnek (zayıf) OpenSSH sunucu yapılandırması — config-audit skill'ini denemek için
+Port 22
+#PermitRootLogin prohibit-password
+PermitRootLogin yes
+PubkeyAuthentication yes
+PasswordAuthentication yes
+PermitEmptyPasswords no
+MaxAuthTries 6
+LoginGraceTime 120
+X11Forwarding yes
+UsePAM yes
+Subsystem sftp /usr/lib/openssh/sftp-server

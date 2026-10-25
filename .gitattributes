@@ -1,0 +1,2 @@
+# Bash betikleri Linux'ta (bulut) CRLF ile çalışmaz.
+*.sh text eol=lf
