@@ -5,3 +5,22 @@ __pycache__/
 site/
 # Agent çalışma panoları; geçici, sürüm kontrolü dışında.
 work/
+# Bulut sandbox'ının (bubblewrap) depo kökünde açtığı boş yer tutucular; yanlışlıkla
+# commit edilmesinler. Proje bunlardan birini gerçekten kullanmaya başlarsa satırı silin.
+/.bashrc
+/.bash_profile
+/.profile
+/.zshrc
+/.zprofile
+/.gitconfig
+/.gitmodules
+/.mcp.json
+/.idea
+/.vscode
+/.claude/commands
+/.claude/launch.json
+/.claude/loop.md
+/.claude/output-styles
+/.claude/routines
+/.claude/scheduled_tasks.json
+/.claude/workflows
