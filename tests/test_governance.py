@@ -268,7 +268,24 @@ def cloud_checks():
     def decide(tool, env, which, **tool_input):
         v = policy_gate.evaluate({"tool_name": tool, "tool_input": tool_input}, govlib.load_policy(),
                                  govlib.registered_skills(), govlib.rel_path, govlib.registered_agents())
-        return policy_gate.apply_cloud_rules(v, tool, env, which).decision
+        return policy_gate.apply_cloud_rules(v, tool, tool_input.get("command", ""), env, which).decision
+
+    git_cases = [
+        # (açıklama, komut, beklenen) — bulutta, sandbox paketleri kurulu
+        ("tek başına git commit geçer", 'git commit -m "Bulut kural testi raporu"', "pass"),
+        ("dosyadan mesajla git commit geçer", "git commit -F msg.txt", "pass"),
+        ("tek başına git push geçer", "git push -u origin claude/test", "pass"),
+        ("zincirlenmiş git commit reddedilir", "git add r.md && git commit -m x", "deny"),
+        ("git push sonrası komut reddedilir", "git push origin x; touch ~/a", "deny"),
+        ("komut ikamesiyle git commit reddedilir", 'git commit -m "$(cat msg)"', "deny"),
+        ("ters tırnakla git commit reddedilir", "git commit -m `id`", "deny"),
+        ("yönlendirmeli git commit reddedilir", "git commit -m x > ~/.bashrc", "deny"),
+        ("--receive-pack ile git push reddedilir", "git push --receive-pack=evil /tmp/r main", "deny"),
+        ("sandbox içindeki git zincirlenebilir", "git status && git log -1", "pass"),
+    ]
+    for label, command, expected in git_cases:
+        yield label, decide("Bash", cloud, have, command=command) == expected
+    yield "yerelde git kuralı uygulanmaz", decide("Bash", local, have, command="git add r.md && git commit -m x") == "pass"
 
     yield "bulutta ASK reddedilir", decide("Bash", cloud, have, command="curl https://example.com") == "deny"
     yield "bulutta kayıt dışı skill reddedilir", decide("Skill", cloud, have, skill="random-skill") == "deny"
@@ -293,6 +310,10 @@ def settings_checks():
     yield "failIfUnavailable Windows'u kilitlemez", sandbox.get("failIfUnavailable") is not True
     yield "denetim kaydına yazma işletim sistemi düzeyinde yasak", f"Edit(/{R('audit_log')})" in deny
     yield "onaylı bilgiye yazma işletim sistemi düzeyinde yasak", f"Edit(/{R('approved')}**)" in deny
+    # Sandbox dışında çalışan git, bu dosyalardaki betikleri çalıştırır.
+    yield "git hook ve config yazımı yasak", {"Edit(/.git/hooks/**)", "Edit(/.git/config)"} <= set(deny)
+    excluded = {c.split()[1] for c in sandbox.get("excludedCommands", [])}
+    yield "sandbox dışı git komutları Gate kuralıyla aynı", excluded == policy_gate.GIT_UNSANDBOXED
 
 
 def main():
