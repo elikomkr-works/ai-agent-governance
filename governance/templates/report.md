@@ -16,3 +16,6 @@
 
 ## Doğrulama Durumu
 <KABUL | RED | BELİRSİZ> — <gerekçe>
+
+## Reviewer Kararı
+BEKLİYOR — <reviewer çalıştıktan sonra Baş Agent yazar: ONAY | DÜZELTME GEREKLİ | RED — tur <n> · <kısa gerekçe>>

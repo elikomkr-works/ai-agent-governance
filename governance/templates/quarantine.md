@@ -3,6 +3,7 @@ kaynak: <birincil kaynak URL'si>
 ek_kaynaklar: <virgülle ayrılmış URL'ler veya boş>
 erisim_tarihi: YYYY-MM-DD
 durum: KARANTINADA
+reviewer: BEKLİYOR
 ozet: <tek cümlelik özet>
 ---
 

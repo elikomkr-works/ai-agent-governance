@@ -184,6 +184,12 @@ th.num, td.num { text-align: right; font-variant-numeric: tabular-nums; }
 tr.open .clamp { display: block; -webkit-line-clamp: unset; }
 .more-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-top: 12px; font-size: 13px; color: var(--text-2); }
 .empty { padding: 32px 8px; text-align: center; font-size: 13px; color: var(--text-2); }
+.stack { margin-top: 16px; }
+.docs { min-width: 760px; }
+.docs td.title { min-width: 220px; max-width: 420px; overflow-wrap: anywhere; }
+.docs .path { display: block; margin-top: 2px; color: var(--text-2); }
+.docs .warn { display: block; margin-top: 2px; font-size: 12px; color: var(--critical); }
+.docs td.nowrap { white-space: nowrap; }
 
 footer { margin-top: 24px; font-size: 12px; color: var(--text-2); overflow-wrap: anywhere; }
 footer p { margin: 0 0 4px; }
@@ -247,6 +253,20 @@ footer p { margin: 0 0 4px; }
     </div>
     <div class="empty" id="rows-empty" hidden>Bu filtrelerle eşleşen kayıt yok.</div>
     <div class="more-row"><span id="rows-count"></span><button class="btn" id="more" type="button">Daha fazla göster</button></div>
+  </section>
+
+  <section class="card stack" aria-labelledby="rep-title">
+    <div class="card-head">
+      <div><h2 id="rep-title">Raporlar</h2><p id="rep-note"></p></div>
+    </div>
+    <div class="table-wrap" id="reports"></div>
+  </section>
+
+  <section class="card stack" aria-labelledby="kn-title">
+    <div class="card-head">
+      <div><h2 id="kn-title">Bilgi kayıtları</h2><p id="kn-note"></p></div>
+    </div>
+    <div class="table-wrap" id="knowledge"></div>
   </section>
 
   <footer id="footer"></footer>
@@ -636,6 +656,67 @@ function renderRows(rows) {
   $('#sort').textContent = state.desc ? 'Sıralama: en yeni önce' : 'Sıralama: en eski önce';
 }
 
+/* ---------- Raporlar ve bilgi kayıtları ---------- */
+
+// Karar değeri → [gösterilen ad, ton]. Boş değer: bölüm/alan yazılmamış.
+const STATUS = { KABUL: ['Kabul', 'good'], RED: ['Red', 'critical'], 'BELİRSİZ': ['Belirsiz', 'warning'] };
+const REVIEW = {
+  ONAY: ['Onay', 'good'], 'DÜZELTME GEREKLİ': ['Düzeltme gerekli', 'warning'], RED: ['Red', 'critical'],
+  'BEKLİYOR': ['Bekliyor', 'neutral'],
+};
+const ICONS = { good: '✓', warning: '!', critical: '✕', neutral: '–' };
+const PLACES = { quarantine: 'Karantina', approved: 'Onaylı' };
+
+function verdict(map, v, empty) {
+  const [label, tone] = map[v] || [v || empty, 'neutral'];
+  return el('span', { class: 'badge' }, el('span', { class: 'si ' + tone, 'aria-hidden': 'true', text: ICONS[tone] }), label);
+}
+
+function titleCell(r, warn) {
+  return el('td', { class: 'title' }, r.title, el('code', { class: 'path', text: r.path }),
+    warn ? el('span', { class: 'warn', text: warn }) : null);
+}
+
+function docTable(box, head, rows, empty) {
+  if (!rows.length) {
+    box.replaceChildren(el('div', { class: 'empty', text: empty }));
+    return;
+  }
+  box.replaceChildren(el('table', { class: 'docs' },
+    el('thead', {}, el('tr', {}, ...head.map(h => el('th', { text: h })))),
+    el('tbody', {}, ...rows)));
+}
+
+function renderDocs() {
+  const reps = DATA.reports || [], kn = DATA.knowledge || [];
+  const reviewed = reps.filter(r => r.review && r.review !== 'BEKLİYOR').length;
+  $('#rep-note').textContent = reps.length
+    ? `${nf.format(reps.length)} rapor · ${nf.format(reviewed)} tanesinde reviewer kararı yazılı. Karar, rapordaki "## Reviewer Kararı" bölümünden okunur.`
+    : '';
+  docTable($('#reports'), ['Rapor', 'Tarih', 'Skill', 'Olgu / Öneri / Doğrulanmamış', 'Doğrulama', 'Reviewer'],
+    reps.map(r => el('tr', {},
+      titleCell(r, r.errors.length ? `Validator: ${r.errors.length} hata — ${r.errors[0]}` : ''),
+      el('td', { class: 'nowrap', text: r.date || '—' }),
+      el('td', { text: r.skill || '—' }),
+      el('td', { class: 'nowrap', text: ['OLGU', 'ÖNERİ', 'DOĞRULANMAMIŞ'].map(k => nf.format(r.labels[k] || 0)).join(' / ') }),
+      el('td', {}, verdict(STATUS, r.status, 'Yok')),
+      el('td', {}, verdict(REVIEW, r.review, 'Yazılmamış')))),
+    'Henüz rapor yok.');
+  const waiting = kn.filter(k => k.place === 'quarantine').length;
+  $('#kn-note').textContent = kn.length
+    ? `${nf.format(kn.length)} kayıt · ${nf.format(waiting)} tanesi karantinada (kullanıcı onayı bekliyor). Kaynak adresleri metin olarak gösterilir, bağlantı değildir.`
+    : '';
+  docTable($('#knowledge'), ['Kayıt', 'Yer', 'Durum', 'Kaynak', 'Erişim', 'Reviewer'],
+    kn.map(k => el('tr', {},
+      titleCell(k, ''),
+      el('td', { class: 'nowrap', text: PLACES[k.place] || k.place }),
+      el('td', { class: 'nowrap', text: k.status || '—' }),
+      el('td', { class: 'title' }, el('code', { text: k.source || '—' })),
+      el('td', { class: 'nowrap', text: k.accessed || '—' }),
+      el('td', {}, verdict(REVIEW, k.review, 'Yazılmamış')))),
+    'Henüz karantina veya onaylı bilgi kaydı yok.');
+}
+
 /* ---------- Kurulum ---------- */
 
 function tally(key) {
@@ -767,6 +848,7 @@ new ResizeObserver(() => {
 }).observe($('.charts'));
 
 render();
+renderDocs();
 </script>
 </body>
 </html>

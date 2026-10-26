@@ -119,6 +119,10 @@ VALIDATOR_CASES = [
     ("etiketsiz bulgu", validator.check_report, GOOD_REPORT.replace("- [ÖNERİ] ", "- "), False),
     ("boş kanıt", validator.check_report, GOOD_REPORT.replace("- `samples/auth.log:2`", ""), False),
     ("hükümsüz doğrulama", validator.check_report, GOOD_REPORT.replace("KABUL", "tamam"), False),
+    ("reviewer kararlı rapor", validator.check_report, GOOD_REPORT + "## Reviewer Kararı\nONAY — tur 1\n", True),
+    ("hükümsüz reviewer kararı", validator.check_report, GOOD_REPORT + "## Reviewer Kararı\nbaktı\n", False),
+    ("reviewer kararlı karantina", validator.check_quarantine, GOOD_QUARANTINE.replace("ozet:", "reviewer: BEKLİYOR\nozet:"), True),
+    ("hükümsüz karantina reviewer", validator.check_quarantine, GOOD_QUARANTINE.replace("ozet:", "reviewer: iyi\nozet:"), False),
     ("geçerli karantina", validator.check_quarantine, GOOD_QUARANTINE, True),
     ("agent ONAYLANDI veremez", validator.check_quarantine, GOOD_QUARANTINE.replace("KARANTINADA", "ONAYLANDI"), False),
     ("kaynaksız karantina", validator.check_quarantine, GOOD_QUARANTINE.replace("kaynak: https://nvd.nist.gov/vuln/detail/CVE-2024-6387\n", ""), False),
@@ -199,6 +203,25 @@ def panel_checks():
         (arch / f"20261026T120000Z_yerel_{govlib.line_hash(lines[0])[:12]}.jsonl").write_text(lines[0] + "\n", encoding="utf-8")
         yield "yayınlanmış satır iki kez sayılmaz", build_site.build(audit, P("panel_template"), out, arch) == (2, 2)
         yield "canlı kayıt olmadan dilimlerden üretilir", build_site.build(tmp / "yok.jsonl", P("panel_template"), out, arch) == (1, 0)
+        reps, quar, appr = tmp / "raporlar", tmp / "karantina", tmp / "onayli"
+        for d in (reps, quar):
+            d.mkdir()
+        (reps / "a.md").write_text(GOOD_REPORT.replace("**", "") + "## Reviewer Kararı\nDÜZELTME GEREKLİ — tur 1, RED değil\n",
+                                   encoding="utf-8")
+        (reps / "b.md").write_text("# </script><script>alert(2)</script>\n## Kapsam\n", encoding="utf-8")
+        (quar / "c.md").write_text(GOOD_QUARANTINE.replace("ozet:", "reviewer: ONAY\nozet:"), encoding="utf-8")
+        build_site.build(audit, P("panel_template"), out, arch, reps, quar, appr)
+        html = out.read_text(encoding="utf-8")
+        m = re.search(r'<script type="application/json" id="panel-data">(.*?)</script>', html, re.S)
+        data = json.loads(m.group(1)) if m else {}
+        a, b = data.get("reports", [{}, {}])
+        yield "rapor kararları okunur", (a.get("status"), a.get("review")) == ("KABUL", "DÜZELTME GEREKLİ")
+        yield "etiketli maddeler sayılır", a.get("labels") == {"OLGU": 1, "ÖNERİ": 1, "DOĞRULANMAMIŞ": 0}
+        yield "eksik raporun validator hatası taşınır", bool(b.get("errors")) and b.get("review") == ""
+        yield "rapor başlığındaki </script> sayfayı kıramaz", "<script>alert(2)" not in html
+        kn = data.get("knowledge", [])
+        yield "karantina kaydı okunur, olmayan onaylı klasör hata vermez", \
+            [(k["place"], k["status"], k["review"]) for k in kn] == [("quarantine", "KARANTINADA", "ONAY")]
         bad_template = tmp / "sablon.html"
         bad_template.write_text("<html></html>", encoding="utf-8")
         yield "yer tutucusuz şablon reddedilir", raises(lambda: build_site.build(audit, bad_template, tmp / "x.html"), ValueError)
