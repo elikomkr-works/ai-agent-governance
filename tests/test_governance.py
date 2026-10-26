@@ -533,7 +533,14 @@ def customer_checks():
         n, errors = new_customer.build(target, name="Deneme", today="2026-01-01")
         copied = {p.relative_to(target).as_posix() for p in target.rglob("*") if p.is_file()}
         yield "müşteri kopyası hatasız üretilir", n > 0 and errors == []
-        data = [R(k) for k in new_customer.NEVER_COPY]
+        # Koddaki listeden bağımsız: bir klasör NEVER_COPY'den düşerse test de ona bakmayı bırakmasın.
+        must_not = ["audit_archive", "reports", "quarantine", "approved", "proposals", "work", "site", "evidence"]
+        yield "kopyalanmayacak veri klasörleri listesi eksiksiz", set(must_not) <= set(new_customer.NEVER_COPY)
+        tracked = subprocess.run(["git", "ls-files"], cwd=ROOT, capture_output=True, text=True).stdout.splitlines()
+        if any(f.startswith(R("audit_archive")) for f in tracked) and any(f.startswith(R("reports")) for f in tracked):
+            yield "kaynaktaki dilimler ve raporlar müşteri kopyasına geçmez", not any(
+                f.startswith((R("audit_archive"), R("reports"))) and not f.endswith("/.gitkeep") for f in copied)
+        data = [R(k) for k in must_not]
         yield "veri klasörlerinden yalnızca .gitkeep geçer", all(
             f.endswith("/.gitkeep") for f in copied if any(f.startswith(d) for d in data))
         yield "Hook'lar, kurallar ve testler kopyalanır", {
