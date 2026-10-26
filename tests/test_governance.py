@@ -24,6 +24,7 @@ import denial_log  # noqa: E402
 sys.path.insert(0, str(govlib.path("tools")))
 import build_site  # noqa: E402
 import verify_audit  # noqa: E402
+import new_customer  # noqa: E402
 
 ENV = dict(os.environ, GOV_AUDIT_LOG=str(Path(tempfile.gettempdir()) / "gov_test_audit.jsonl"))
 # Hook vakaları yerel davranışı sınar; bulut kuralları cloud_checks() içinde ayrıca sınanır.
@@ -524,6 +525,44 @@ def ir_collect_checks():
         subprocess.run(["sudo", "-n", "rm", "-rf", str(out.parent)])
 
 
+def customer_checks():
+    """tools/new_customer.py müşteri reposuna yalnızca sistem dosyalarını taşıyor mu: (açıklama, sonuç)."""
+    base = Path(tempfile.mkdtemp())
+    try:
+        target = base / "musteri"
+        n, errors = new_customer.build(target, name="Deneme", today="2026-01-01")
+        copied = {p.relative_to(target).as_posix() for p in target.rglob("*") if p.is_file()}
+        yield "müşteri kopyası hatasız üretilir", n > 0 and errors == []
+        data = [R(k) for k in new_customer.NEVER_COPY]
+        yield "veri klasörlerinden yalnızca .gitkeep geçer", all(
+            f.endswith("/.gitkeep") for f in copied if any(f.startswith(d) for d in data))
+        yield "Hook'lar, kurallar ve testler kopyalanır", {
+            ".claude/settings.json", ".claude/hooks/policy_gate.py", R("policy"), "tests/test_governance.py"} <= copied
+        yield "beyaz liste dışındaki kök dosyaları kopyalanmaz", all(
+            "/" in f or f in {"CLAUDE.md", ".gitignore", ".gitattributes", new_customer.GUIDE} for f in copied)
+        wf = (target / new_customer.WORKFLOW).read_text(encoding="utf-8")
+        yield "müşteri CI'ında Pages yayını yok, testler var", "pages" not in wf and "test_governance.py" in wf
+        yield "müşteri CLAUDE.md'si Pages yayını vaat etmez", new_customer.PAGES_NOTE not in (target / "CLAUDE.md").read_text(encoding="utf-8")
+        _, errs = verify_audit.verify(target / R("audit_log"), target / R("approved"), archive_dir=target / R("audit_archive"))
+        yield "boş müşteri reposu denetim kaydı kontrolünden geçer", errs == []
+        yield "dolu klasöre kurulum reddedilir", new_customer.build(target, name="X")[1] != []
+        yield "sistem reposunun içine kurulum reddedilir", new_customer.build(P("work") / "m", name="X")[1] != []
+        yield "müşteri reposu olmayan klasör güncellenmez", new_customer.build(base / "yok", update=True)[1] != []
+        policy_file = target / R("policy")
+        policy = json.loads(policy_file.read_text(encoding="utf-8"))
+        policy["scope"]["allowed_targets"].append("10.0.0.5")
+        policy_file.write_text(json.dumps(policy), encoding="utf-8")
+        (target / R("reports") / "r.md").write_text("müşteri raporu", encoding="utf-8")
+        _, errs = new_customer.build(target, update=True, today="2026-02-01")
+        kept = json.loads(policy_file.read_text(encoding="utf-8"))["scope"]["allowed_targets"]
+        guide = (target / new_customer.GUIDE).read_text(encoding="utf-8")
+        yield "güncelleme müşteri kapsamını korur", errs == [] and "10.0.0.5" in kept
+        yield "güncelleme müşteri verisine ve kılavuza dokunmaz", (
+            (target / R("reports") / "r.md").exists() and "Deneme" in guide and "2026-02-01: sistem güncellendi" in guide)
+    finally:
+        shutil.rmtree(base, ignore_errors=True)
+
+
 def settings_checks():
     """.claude/settings.json: sandbox ve yazma yasakları paths.json ile uyumlu mu: (açıklama, sonuç)."""
     settings = govlib.load_json(ROOT / ".claude" / "settings.json")
@@ -637,6 +676,10 @@ def main():
 
     print("== Kanıt toplama betiği ==")
     for label, ok in ir_collect_checks():
+        report(ok, label)
+
+    print("== Müşteri reposu ==")
+    for label, ok in customer_checks():
         report(ok, label)
 
     print(f"\nSonuç: {failures} başarısız" if failures else "\nSonuç: tüm testler geçti")
