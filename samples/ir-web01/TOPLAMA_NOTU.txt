@@ -1,0 +1,8 @@
+ÖRNEK KANIT SETİ — uydurma veridir, gerçek bir sunucudan alınmamıştır.
+Host: web01
+Toplayan: sistem yöneticisi (örnek)
+Toplama zamanı: 2026-10-25T08:30:00Z
+Sunucu saat dilimi: UTC (timedatectl: Time zone: Etc/UTC)
+Aktarım: scp ile yönetici iş istasyonuna, oradan proje klasörüne
+Yeniden adlandırma: /home/deploy/x.sh -> x.sh.kanit (cp -p, chmod 0444)
+Eksik: at_jobs.txt, exe_deleted.txt, changed_files.txt toplanmadı.

@@ -1,0 +1,6 @@
+## root
+(bkz. crontab_root.txt)
+## deploy
+no crontab for deploy
+## alice
+0 1 * * * /home/alice/bin/backup.sh

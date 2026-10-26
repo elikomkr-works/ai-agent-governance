@@ -1,0 +1,9 @@
+/root/.ssh/:
+drwx------ 2 root root 4096 2026-10-24 02:13:38.204000000 +0000 .
+-rw------- 1 root root  187 2026-10-24 02:13:38.204000000 +0000 authorized_keys
+/home/alice/.ssh/:
+-rw------- 1 alice alice 104 2026-04-02 08:11:45.000000000 +0000 authorized_keys
+## /root/.ssh/authorized_keys
+ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIORNEKORNEKORNEKORNEKORNEKORNEKORNEKORNEK0000 sysupd@localhost
+## /home/alice/.ssh/authorized_keys
+ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIALICEALICEALICEALICEALICEALICEALICEALICE0000 alice@laptop

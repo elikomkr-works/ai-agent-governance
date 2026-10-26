@@ -1,0 +1,7 @@
+/etc/systemd/system/:
+drwxr-xr-x 2 root root 4096 2026-03-02 10:15:01.000000000 +0000 multi-user.target.wants
+lrwxrwxrwx 1 root root   35 2026-03-02 10:15:01.000000000 +0000 sshd.service -> /lib/systemd/system/ssh.service
+/etc/systemd/system/multi-user.target.wants/:
+lrwxrwxrwx 1 root root   36 2026-03-02 10:15:01.000000000 +0000 nginx.service -> /lib/systemd/system/nginx.service
+lrwxrwxrwx 1 root root   35 2026-03-02 10:15:01.000000000 +0000 cron.service -> /lib/systemd/system/cron.service
+(yerel .service/.timer dosyası yok)

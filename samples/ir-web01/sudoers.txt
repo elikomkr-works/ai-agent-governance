@@ -1,0 +1,8 @@
+-r--r----- 1 root root 1800 2026-03-02 10:14:22.000000000 +0000 /etc/sudoers
+drwxr-xr-x 2 root root 4096 2026-03-02 10:14:22.000000000 +0000 /etc/sudoers.d
+## /etc/sudoers
+Defaults	env_reset
+root	ALL=(ALL:ALL) ALL
+%sudo	ALL=(ALL:ALL) ALL
+## /etc/sudoers.d/
+(boş)

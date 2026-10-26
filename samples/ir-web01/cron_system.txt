@@ -1,0 +1,7 @@
+-rw-r--r-- 1 root root  1042 2026-03-02 10:14:22.000000000 +0000 /etc/crontab
+drwxr-xr-x 2 root root  4096 2026-03-02 10:14:22.000000000 +0000 /etc/cron.d
+-rw------- 1 root crontab 118 2026-10-24 02:13:41.512000000 +0000 /var/spool/cron/crontabs/root
+-rw------- 1 alice crontab 96 2026-05-11 09:20:03.000000000 +0000 /var/spool/cron/crontabs/alice
+## /etc/crontab
+17 *    * * *   root    cd / && run-parts --report /etc/cron.hourly
+25 6    * * *   root    test -x /usr/sbin/anacron || run-parts --report /etc/cron.daily

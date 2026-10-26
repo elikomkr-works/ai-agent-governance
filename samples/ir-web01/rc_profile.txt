@@ -1,0 +1,8 @@
+-rw-r--r-- 1 root root 769 2026-03-02 10:14:22.000000000 +0000 /etc/profile
+-rw-r--r-- 1 root root 2319 2026-03-02 10:14:22.000000000 +0000 /etc/bash.bashrc
+-rw-r--r-- 1 root root 3771 2026-03-02 10:14:22.000000000 +0000 /root/.bashrc
+-rw-r--r-- 1 deploy deploy 3771 2026-03-02 10:20:10.000000000 +0000 /home/deploy/.bashrc
+ls: cannot access '/etc/rc.local': No such file or directory
+ls: cannot access '/etc/ld.so.preload': No such file or directory
+## /etc/profile.d/
+-rw-r--r-- 1 root root 96 2026-03-02 10:14:22.000000000 +0000 01-locale-fix.sh

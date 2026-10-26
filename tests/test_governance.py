@@ -91,6 +91,16 @@ GATE_CASES = [
     ("kayıt dışı agent", "Agent", {"subagent_type": "hacker-bot", "prompt": "x"}, "ask"),
     ("türsüz agent (general-purpose) onaya düşer", "Agent", {"prompt": "x"}, "ask"),
     ("web araması serbest", "WebSearch", {"query": "CVE-2024-6387"}, "pass"),
+    ("kanıt klasörüne yazma", "Write", {"file_path": str(P("evidence") / "web01" / "x.md")}, "deny"),
+    ("kanıt dosyası düzenleme", "Edit", {"file_path": R("evidence") + "/web01/crontab_root.txt"}, "deny"),
+    ("kanıt dosyasına izin verme", "Bash", {"command": f"chmod +x {R('evidence')}/web01/x.sh.kanit"}, "deny"),
+    ("kanıt hash'ini dosyaya yönlendirme", "Bash",
+     {"command": f"sha256sum {R('evidence')}/web01/x.sh.kanit > reports/h.txt"}, "deny"),
+    ("kanıtı kabukla kopyalama", "Bash", {"command": f"cp a.txt {R('evidence')}/web01/"}, "deny"),
+    ("kanıt okuma serbest", "Read", {"file_path": str(P("evidence") / "web01" / "ps.txt")}, "pass"),
+    ("kanıt hash'i serbest", "Bash", {"command": f"sha256sum {R('evidence')}/web01/x.sh.kanit"}, "pass"),
+    ("kayıtlı olay müdahale skill'i", "Skill", {"skill": "incident-response"}, "pass"),
+    ("kayıtlı olay müdahale agent'ı", "Agent", {"subagent_type": "incident-responder", "prompt": "x"}, "pass"),
 ]
 
 GOOD_REPORT = """# Test
@@ -114,7 +124,26 @@ ozet: OpenSSH sinyal işleyici yarış durumu.
 # CVE-2024-6387
 """
 
+IR_EVIDENCE = """### Kalıcılık
+| # | Sonuç | Dosya:satır |
+|---|---|---|
+| K1 | İZ VAR | crontab_root.txt:3 |
+| K2 | İZ YOK | systemd_units.txt |
+| K3 | İZ YOK | rc_profile.txt |
+| K4 | İZ VAR | ssh_keys.txt:5 |
+| K5 | İZ YOK | passwd.txt |
+| K6 | İZ YOK | suid_sgid.txt |
+- x.sh.kanit `""" + "a" * 64 + "`\n"
+GOOD_IR = GOOD_REPORT.replace("- `samples/auth.log:2`\n", IR_EVIDENCE)
+
 VALIDATOR_CASES = [
+    ("geçerli olay müdahale raporu", validator.check_ir_report, GOOD_IR, True),
+    ("kalıcılık maddesi eksik", validator.check_ir_report, GOOD_IR.replace("| K6 | İZ YOK | suid_sgid.txt |\n", ""), False),
+    ("kalıcılık sonucu yazılmamış", validator.check_ir_report, GOOD_IR.replace("| K2 | İZ YOK", "| K2 | bakıldı"), False),
+    ("hash'siz olay müdahale raporu", validator.check_ir_report, GOOD_IR.replace("a" * 64, "yok"), False),
+    ("KANIT YOK varken KABUL verilemez", validator.check_ir_report, GOOD_IR.replace("| K6 | İZ YOK", "| K6 | KANIT YOK"), False),
+    ("KANIT YOK varken BELİRSİZ geçer", validator.check_ir_report,
+     GOOD_IR.replace("| K6 | İZ YOK", "| K6 | KANIT YOK").replace("KABUL", "BELİRSİZ"), True),
     ("geçerli rapor", validator.check_report, GOOD_REPORT, True),
     ("bölüm eksik", validator.check_report, GOOD_REPORT.replace("## Kanıt", "## Notlar"), False),
     ("etiketsiz bulgu", validator.check_report, GOOD_REPORT.replace("- [ÖNERİ] ", "- "), False),
@@ -527,6 +556,18 @@ def main():
         report(bool(out) and out.get("decision") == "block", "Stop bozuk rapor varken bitirmeyi engeller")
         out = run_hook("validator.py", {"hook_event_name": "Stop", "stop_hook_active": True})
         report(bool(out) and "systemMessage" in out, "Stop ikinci denemede döngüye girmez, kullanıcıyı uyarır")
+    finally:
+        tmp.unlink(missing_ok=True)
+
+    # Olay müdahale kontrolü dosya adındaki '_ir_' ile devreye girer: genel rapor olarak geçerli metin burada reddedilir.
+    tmp = P("reports") / "_test_ir_gecici.md"
+    try:
+        tmp.write_text(GOOD_REPORT, encoding="utf-8")
+        payload = {"hook_event_name": "PostToolUse", "tool_name": "Write", "tool_input": {"file_path": str(tmp)}}
+        out = run_hook("validator.py", payload)
+        report(bool(out) and out.get("decision") == "block", "'_ir_' raporunda kalıcılık tablosu zorunlu")
+        tmp.write_text(GOOD_IR, encoding="utf-8")
+        report(run_hook("validator.py", payload) is None, "tam olay müdahale raporu geçer")
     finally:
         tmp.unlink(missing_ok=True)
 

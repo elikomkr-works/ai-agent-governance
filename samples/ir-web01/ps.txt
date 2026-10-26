@@ -1,0 +1,7 @@
+  PID  PPID USER     STARTED                  COMMAND
+    1     0 root     Sat Oct 24 00:00:01 2026 /sbin/init
+  612     1 root     Sat Oct 24 00:00:04 2026 /usr/sbin/cron -f
+  640     1 root     Sat Oct 24 00:00:04 2026 sshd: /usr/sbin/sshd -D
+  701     1 www-data Sat Oct 24 00:00:05 2026 nginx: worker process
+ 9120   612 root     Sun Oct 25 08:25:01 2026  \_ /bin/sh -c /tmp/.cache/upd >/dev/null 2>&1
+ 9121  9120 root     Sun Oct 25 08:25:01 2026      \_ /tmp/.cache/upd
