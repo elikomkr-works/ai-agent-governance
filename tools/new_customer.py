@@ -78,8 +78,9 @@ def keep_scope(target, data):
 
 
 def source_commit():
-    return subprocess.run(["git", "rev-parse", "--short", "HEAD"], cwd=ROOT,
-                          capture_output=True, text=True, check=True).stdout.strip()
+    # İlk commit'ten önce (ör. yeni müşteri reposunda testler koşarken) HEAD yoktur.
+    out = subprocess.run(["git", "rev-parse", "--short", "HEAD"], cwd=ROOT, capture_output=True, text=True)
+    return out.stdout.strip() if out.returncode == 0 else "commit yok"
 
 
 def guide(name, commit, today):
