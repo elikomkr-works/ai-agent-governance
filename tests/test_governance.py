@@ -19,6 +19,7 @@ sys.path.insert(0, str(HOOKS))
 import govlib  # noqa: E402
 import policy_gate  # noqa: E402
 import validator  # noqa: E402
+import denial_log  # noqa: E402
 
 sys.path.insert(0, str(govlib.path("tools")))
 import build_site  # noqa: E402
@@ -74,6 +75,7 @@ GATE_CASES = [
      {"command": f"echo x > '{P('policy').as_posix()}'"}, "ask"),
     ("onaylı bilgiyi okuma serbest", "Bash", {"command": f"cat {R('approved')}a.md 2>/dev/null"}, "pass"),
     ("denetim kaydına yazma", "Edit", {"file_path": R("audit_log")}, "deny"),
+    ("denetim dilimine yazma", "Write", {"file_path": R("audit_archive") + "x.jsonl"}, "deny"),
     ("politika değişikliği", "Edit", {"file_path": R("policy")}, "ask"),
     ("yol yapılandırması değişikliği", "Write", {"file_path": str(P("paths_file"))}, "ask"),
     ("hook değişikliği", "Write", {"file_path": str(HOOKS / "policy_gate.py")}, "ask"),
@@ -118,6 +120,10 @@ VALIDATOR_CASES = [
     ("etiketsiz bulgu", validator.check_report, GOOD_REPORT.replace("- [ÖNERİ] ", "- "), False),
     ("boş kanıt", validator.check_report, GOOD_REPORT.replace("- `samples/auth.log:2`", ""), False),
     ("hükümsüz doğrulama", validator.check_report, GOOD_REPORT.replace("KABUL", "tamam"), False),
+    ("reviewer kararlı rapor", validator.check_report, GOOD_REPORT + "## Reviewer Kararı\nONAY — tur 1\n", True),
+    ("hükümsüz reviewer kararı", validator.check_report, GOOD_REPORT + "## Reviewer Kararı\nbaktı\n", False),
+    ("reviewer kararlı karantina", validator.check_quarantine, GOOD_QUARANTINE.replace("ozet:", "reviewer: BEKLİYOR\nozet:"), True),
+    ("hükümsüz karantina reviewer", validator.check_quarantine, GOOD_QUARANTINE.replace("ozet:", "reviewer: iyi\nozet:"), False),
     ("geçerli karantina", validator.check_quarantine, GOOD_QUARANTINE, True),
     ("agent ONAYLANDI veremez", validator.check_quarantine, GOOD_QUARANTINE.replace("KARANTINADA", "ONAYLANDI"), False),
     ("kaynaksız karantina", validator.check_quarantine, GOOD_QUARANTINE.replace("kaynak: https://nvd.nist.gov/vuln/detail/CVE-2024-6387\n", ""), False),
@@ -188,11 +194,35 @@ def panel_checks():
         m = re.search(r'<script type="application/json" id="panel-data">(.*?)</script>', html, re.S)
         data = json.loads(m.group(1)) if m else {}
         yield "geçerli satırlar okunur, bozuklar sayılır", counts == (2, 2)
-        yield "bozuk satırların numarası raporlanır", [e["line"] for e in data.get("errors", [])] == [2, 4]
+        yield "bozuk satırların numarası raporlanır", [e["line"] for e in data.get("errors", [])] == ["satır 2", "satır 4"]
         yield "kayıttaki </script> sayfayı kıramaz", html.count("</script>") == 2 and "<script>alert" not in html
         yield "gömülü veri aslına sadık", bool(data) and data["records"][0]["detail"] == evil
         yield "eksik alanlar boş metin olur", bool(data) and data["records"][1]["reason"] == ""
         yield "dış kaynak yüklenmez", not re.search(r"""(src|href)\s*=\s*["']?(https?:)?//""", html)
+        arch = tmp / "arsiv"
+        arch.mkdir()
+        (arch / f"20261026T120000Z_yerel_{govlib.line_hash(lines[0])[:12]}.jsonl").write_text(lines[0] + "\n", encoding="utf-8")
+        yield "yayınlanmış satır iki kez sayılmaz", build_site.build(audit, P("panel_template"), out, arch) == (2, 2)
+        yield "canlı kayıt olmadan dilimlerden üretilir", build_site.build(tmp / "yok.jsonl", P("panel_template"), out, arch) == (1, 0)
+        reps, quar, appr = tmp / "raporlar", tmp / "karantina", tmp / "onayli"
+        for d in (reps, quar):
+            d.mkdir()
+        (reps / "a.md").write_text(GOOD_REPORT.replace("**", "") + "## Reviewer Kararı\nDÜZELTME GEREKLİ — tur 1, RED değil\n",
+                                   encoding="utf-8")
+        (reps / "b.md").write_text("# </script><script>alert(2)</script>\n## Kapsam\n", encoding="utf-8")
+        (quar / "c.md").write_text(GOOD_QUARANTINE.replace("ozet:", "reviewer: ONAY\nozet:"), encoding="utf-8")
+        build_site.build(audit, P("panel_template"), out, arch, reps, quar, appr)
+        html = out.read_text(encoding="utf-8")
+        m = re.search(r'<script type="application/json" id="panel-data">(.*?)</script>', html, re.S)
+        data = json.loads(m.group(1)) if m else {}
+        a, b = data.get("reports", [{}, {}])
+        yield "rapor kararları okunur", (a.get("status"), a.get("review")) == ("KABUL", "DÜZELTME GEREKLİ")
+        yield "etiketli maddeler sayılır", a.get("labels") == {"OLGU": 1, "ÖNERİ": 1, "DOĞRULANMAMIŞ": 0}
+        yield "eksik raporun validator hatası taşınır", bool(b.get("errors")) and b.get("review") == ""
+        yield "rapor başlığındaki </script> sayfayı kıramaz", "<script>alert(2)" not in html
+        kn = data.get("knowledge", [])
+        yield "karantina kaydı okunur, olmayan onaylı klasör hata vermez", \
+            [(k["place"], k["status"], k["review"]) for k in kn] == [("quarantine", "KARANTINADA", "ONAY")]
         bad_template = tmp / "sablon.html"
         bad_template.write_text("<html></html>", encoding="utf-8")
         yield "yer tutucusuz şablon reddedilir", raises(lambda: build_site.build(audit, bad_template, tmp / "x.html"), ValueError)
@@ -259,6 +289,62 @@ def audit_checks():
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def slice_checks():
+    """Dilimli denetim kaydı: publish_audit yazımı ve verify_audit dilim kontrolleri: (açıklama, sonuç)."""
+    import publish_audit
+    from datetime import datetime, timedelta, timezone
+    tmp = Path(tempfile.mkdtemp(prefix="gov_slice_"))
+    saved = os.environ.get("GOV_AUDIT_LOG")
+    t0 = datetime(2026, 10, 26, 12, 0, 0, tzinfo=timezone.utc)
+    try:
+        log, arch, approved = tmp / "audit.jsonl", tmp / "arsiv", tmp / "approved"
+        os.environ["GOV_AUDIT_LOG"] = str(log)
+        write = lambda n, tag: [govlib.audit("PreToolUse", "Bash", "pass", "", f"{tag} {i}", {"session_id": "s"}) for i in range(n)]
+
+        def check(base_raw=None, base_slices=None, live=log):
+            return verify_audit.verify(live, approved, base_raw, arch, base_slices)
+
+        write(3, "ilk")
+        legacy = log.read_bytes()
+        out1, n1, e1 = publish_audit.publish(log, arch, approved, "yerel", t0)
+        yield "ilk dilim tüm satırları alır", n1 == 3 and e1 == [] and verify_audit.SLICE_NAME.match(out1.name)
+        write(2, "ikinci")
+        out2, n2, _ = publish_audit.publish(log, arch, approved, "yerel", t0 + timedelta(seconds=1))
+        yield "ikinci dilim yalnızca yeni satırları alır", n2 == 2 and out2.read_bytes().count(b"\n") == 2
+        yield "yeni kayıt yoksa dilim yazılmaz", publish_audit.publish(log, arch, approved, "yerel", t0)[0] is None
+        n, errs = check()
+        yield "dilimler + canlı kayıt hatasız, satırlar bir kez sayılır", errs == [] and n == 5
+        yield "canlı kayıt olmadan (CI) dilimler hatasız", check(live=tmp / "yok.jsonl") == (5, [])
+        yield "eski izlenen kayıt dilimlerin başıysa geçer", check(base_raw=legacy, live=tmp / "yok.jsonl")[1] == []
+
+        base = {p.name: p.read_bytes() for p in arch.iterdir()}
+        out2.write_bytes(out2.read_bytes().replace(b"ikinci 0", b"ikinci X"))
+        yield "değiştirilen dilim bulunur (zincir)", bool(check()[1])
+        yield "değiştirilen dilim bulunur (taban)", any("değiştirilmiş" in e for e in check(base_slices=base)[1])
+        out2.write_bytes(base[out2.name])
+        out2.unlink()
+        yield "silinen dilim bulunur (taban)", any("silinmiş" in e for e in check(base_slices=base)[1])
+        out2.write_bytes(base[out2.name])
+        out1.rename(arch / out1.name.replace("120000Z", "115959Z").replace(out1.name[23:35], "0" * 12))
+        yield "logid ilk satırla eşleşmezse bulunur", any("logid" in e for e in check()[1])
+        (arch / out1.name).write_bytes(base[out1.name])
+        for p in arch.glob("*_000000000000.jsonl"):
+            p.unlink()
+        (arch / "rastgele.jsonl").write_text("{}\n", encoding="utf-8")
+        yield "biçimsiz dilim adı bulunur", any("biçime uymuyor" in e for e in check()[1])
+        (arch / "rastgele.jsonl").unlink()
+
+        log.write_bytes(log.read_bytes().replace(b"ilk 1", b"ilk Y"))
+        yield "yayınlanmış satırı değişen canlı kayıt bulunur", any("uyuşmuyor" in e for e in check()[1])
+        yield "hatalı canlı kayıt yayınlanmaz", publish_audit.publish(log, arch, approved, "yerel", t0 + timedelta(seconds=9))[0] is None
+    finally:
+        if saved is None:
+            os.environ.pop("GOV_AUDIT_LOG", None)
+        else:
+            os.environ["GOV_AUDIT_LOG"] = saved
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def tool_turn(tid, name, inp, text, decision=None, is_error=True):
     """Transcript'te bir araç çağrısı ve sonucu (Claude Code'un JSONL biçimi)."""
     use = {"type": "assistant", "message": {"content": [{"type": "tool_use", "id": tid, "name": name, "input": inp}]}}
@@ -304,6 +390,16 @@ def denial_checks():
         yield "kayıtta araç, girdi ve gerekçe kodu var", (
             t1.get("event") == "Permission" and t1.get("decision") == "deny" and t1.get("tool") == "Edit"
             and ".git/config" in t1.get("detail", "") and t1.get("reason", "").startswith("rule:projectSettings"))
+        yield "deny kuralı retlerinde eşleşen kural yazılır", "[kural: Edit(/.git/config)]" in t1.get("reason", "")
+        match = denial_log.matching_rule
+        yield "Edit kuralı Write çağrısını da kapsar", match(
+            "rule:projectSettings", "Write", {"file_path": str(ROOT / ".git/hooks/pre-commit")}, ROOT) == "Edit(/.git/hooks/**)"
+        yield "kural dışı yol için kural yazılmaz", match("rule:projectSettings", "Edit", {"file_path": "README.md"}, ROOT) == ""
+        rule = denial_log.rule_matches
+        yield "Bash önek ve joker kuralları eşleşir", (
+            rule("Bash(curl:*)", "Bash", {"command": "curl -s x"}, ROOT, ROOT)
+            and not rule("Bash(curl:*)", "Bash", {"command": "curlx"}, ROOT, ROOT)
+            and rule("Bash(git push*)", "Bash", {"command": "git push origin"}, ROOT, ROOT))
         run_hook("denial_log.py", stop, env)
         yield "tekrar taramada aynı ret ikinci kez yazılmaz", len(records()) == 3
         denied = {"hook_event_name": "PermissionDenied", "session_id": "s1", "tool_name": "Bash", "reason": "[Kural]"}
@@ -378,6 +474,7 @@ def settings_checks():
     yield "failIfUnavailable Windows'u kilitlemez", sandbox.get("failIfUnavailable") is not True
     yield "denetim kaydına yazma işletim sistemi düzeyinde yasak", f"Edit(/{R('audit_log')})" in deny
     yield "onaylı bilgiye yazma işletim sistemi düzeyinde yasak", f"Edit(/{R('approved')}**)" in deny
+    yield "denetim dilimlerine yazma işletim sistemi düzeyinde yasak", f"Edit(/{R('audit_archive')}**)" in deny
     # Sandbox dışında çalışan git, bu dosyalardaki betikleri çalıştırır.
     yield "git hook ve config yazımı yasak", {"Edit(/.git/hooks/**)", "Edit(/.git/config)"} <= set(deny)
     yield "izin reddi kaydı hook'ları bağlı", all(
@@ -385,8 +482,11 @@ def settings_checks():
     excluded = {c.split()[1] for c in sandbox.get("excludedCommands", [])}
     yield "sandbox dışı git komutları Gate kuralıyla aynı", excluded == policy_gate.GIT_UNSANDBOXED
     # .gitignore'daki sandbox yer tutucuları yönetişim dosyalarını gizlememeli.
+    # Canlı kayıt bilerek izlenmez; yayınlanan kısmı dilimlerdedir.
     governed = [".claude/settings.json", ".claude/hooks/policy_gate.py", ".claude/agents/reviewer.md",
-                R("audit_log"), R("policy"), R("reports") + "r.md", R("approved") + "a.md"]
+                R("audit_archive") + "d.jsonl", R("policy"), R("reports") + "r.md", R("approved") + "a.md"]
+    yield "canlı denetim kaydı git'te izlenmez", subprocess.run(
+        ["git", "check-ignore", "-q", "--no-index", R("audit_log")], cwd=ROOT).returncode == 0
     ignored = [p for p in governed
                if subprocess.run(["git", "check-ignore", "-q", "--no-index", p], cwd=ROOT).returncode == 0]
     yield "sandbox yer tutucuları yönetişim dosyalarını gizlemez", ignored == []
@@ -445,6 +545,10 @@ def main():
 
     print("== Denetim kaydı bütünlüğü ==")
     for label, ok in audit_checks():
+        report(ok, label)
+
+    print("== Denetim kaydı dilimleri ==")
+    for label, ok in slice_checks():
         report(ok, label)
 
     print("== İzin reddi kaydı ==")
