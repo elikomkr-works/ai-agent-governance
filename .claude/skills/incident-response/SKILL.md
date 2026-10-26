@@ -10,10 +10,10 @@ description: Kullanıcının sunucudan dışa aktarıp yerel bir kanıt klasör�
 - Host adı, kanıtın toplandığı an (UTC) ve sunucunun saat dilimi. Bilinmiyorsa Kapsam bölümüne "bilinmiyor" yaz.
 - Hash manifesti (`MANIFEST.sha256`): kullanıcının sunucuda aldığı SHA-256 listesi. Manifest yoksa kanıt bütünlüğü doğrulanamaz. Bunu Kapsam bölümüne yaz.
 - (varsa) Tetikleyen rapor, ör. `reports/2026-10-25_log_auth-uctan-uca.md`. Zaman penceresi ve ilk IOC'ler bu rapordan alınır.
-- Bir kanıt eksikse aşağıdaki tablodaki toplama komutunu kullanıcıya öner. Komutu sen çalıştırma.
+- Bir kanıt eksikse aşağıdaki tablodaki toplama komutunu kullanıcıya öner. Kanıt hiç toplanmadıysa `tools/ir_collect.sh` betiğini öner. Komutu da betiği de sen çalıştırma.
 
 ### Beklenen kanıtlar
-Kanıtları kullanıcı kendi yetkisiyle sunucuda toplar ve her çıktıyı ayrı bir dosyaya yazar. Örnek komutlar Linux/systemd içindir ve dağıtıma göre değişebilir.
+Kanıtları kullanıcı kendi yetkisiyle sunucuda toplar ve her çıktıyı ayrı bir dosyaya yazar. Önerilen yol `tools/ir_collect.sh` betiğidir: `sudo bash ir_collect.sh <çıktı klasörü> '<başlangıç>' '<bitiş>' [şüpheli dosya ...]`. Betik tablodaki tüm dosyaları, `MANIFEST.sha256`'yı ve `TOPLAMA_NOTU.txt`'yi tek seferde üretir. Sıfır dışı dönen komutları da `TOPLAMA_NOTU.txt` içine yazar. Elle toplamada dosya atlanabilir. Örnek komutlar Linux/systemd içindir ve dağıtıma göre değişebilir.
 
 | Dosya | İçerik | Örnek toplama komutu (kullanıcı, sunucuda) |
 |---|---|---|
@@ -22,10 +22,10 @@ Kanıtları kullanıcı kendi yetkisiyle sunucuda toplar ve her çıktıyı ayr�
 | `crontab_root.txt` | root crontab | `crontab -l -u root` |
 | `crontab_users.txt` | diğer kullanıcıların crontab'ları | `for u in $(cut -d: -f1 /etc/passwd); do echo "## $u"; crontab -l -u "$u" 2>&1; done` |
 | `cron_system.txt` | `/etc/crontab`, `/etc/cron.*`, `/var/spool/cron` içerikleri ve zaman damgaları | `ls -la --time-style=full-iso <yollar>; cat /etc/crontab /etc/cron.d/*` |
-| `at_jobs.txt` | zamanlanmış `at` işleri | `atq` |
+| `at_jobs.txt` | zamanlanmış `at` işleri ve içerikleri | `atq; for j in $(atq \| cut -f1); do echo "## iş $j"; at -c "$j"; done` |
 | `systemd_units.txt` | unit ve timer listesi | `systemctl list-unit-files --no-pager; systemctl list-timers --all --no-pager` |
 | `systemd_files.txt` | yerel unit dosyaları | `ls -la --time-style=full-iso /etc/systemd/system/ /etc/systemd/system/*.wants/; cat /etc/systemd/system/*.service /etc/systemd/system/*.timer` |
-| `rc_profile.txt` | `/etc/rc.local`, `/etc/profile`, `/etc/profile.d/`, `/etc/bash.bashrc`, `/etc/ld.so.preload`, root ve kullanıcıların `.bashrc`/`.profile` dosyaları | `ls -la --time-style=full-iso <dosyalar>; cat <dosyalar>` |
+| `rc_profile.txt` | `/etc/rc.local`, `/etc/profile`, `/etc/profile.d/`, `/etc/bash.bashrc`, `/etc/environment`, `/etc/ld.so.preload`, root ve kullanıcıların `.bashrc`/`.profile`/`.bash_profile` dosyaları; **zaman damgaları ve içerikleri** | `ls -la --time-style=full-iso <dosyalar>; for f in <dosyalar>; do echo "## $f"; cat "$f"; done` (yalnızca `ls` yetmez: K3 içerik ister) |
 | `ssh_keys.txt` | tüm `authorized_keys*` içerikleri ve `.ssh` zaman damgaları | `ls -la --time-style=full-iso /root/.ssh/ /home/*/.ssh/; for f in /root/.ssh/authorized_keys* /home/*/.ssh/authorized_keys*; do echo "## $f"; cat "$f"; done` |
 | `passwd.txt`, `group.txt` | hesaplar ve gruplar | `cat /etc/passwd`, `cat /etc/group` (**`/etc/shadow` istenmez**) |
 | `sudoers.txt` | sudo yetkileri | `ls -la --time-style=full-iso /etc/sudoers /etc/sudoers.d/; cat /etc/sudoers /etc/sudoers.d/*` |

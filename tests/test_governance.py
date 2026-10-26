@@ -493,6 +493,37 @@ def cloud_checks():
     yield "kurulum betiği her durumda 0 ile çıkar", setup.rstrip().endswith("exit 0")
 
 
+def ir_collect_checks():
+    """tools/ir_collect.sh, skill'in beklenen kanıt tablosunu eksiksiz üretiyor mu: (açıklama, sonuç)."""
+    script = (P("tools") / "ir_collect.sh").read_text(encoding="utf-8")
+    skill = (ROOT / ".claude" / "skills" / "incident-response" / "SKILL.md").read_text(encoding="utf-8")
+    table = skill.split("### Beklenen kanıtlar", 1)[1].split("\n\n", 2)[1]
+    expected = set(re.findall(r"`([\w.]+\.(?:txt|sha256))`", "\n".join(
+        line.split("|")[1] for line in table.splitlines() if line.startswith("| `"))))
+    produced = set(re.findall(r"^run ([\w.]+\.txt) ", script, re.M)) | {"TOPLAMA_NOTU.txt", "MANIFEST.sha256"}
+    yield "toplama betiği beklenen kanıtların hepsini üretir", len(expected) >= 18 and expected <= produced
+    yield "toplama betiği toplama notunu ve manifesti yazar", all(f'"$OUT/{f}"' in script for f in ("TOPLAMA_NOTU.txt", "MANIFEST.sha256"))
+    code = "\n".join(line for line in script.splitlines() if not line.lstrip().startswith("#"))
+    yield "toplama betiği shadow ve özel anahtar kopyalamaz", "/etc/shadow" not in code and "shadow | gshadow | id_* | *.pem | *.key)" in script
+    yield "toplama betiği ağa çıkmaz", not re.search(r"\b(curl|wget|scp|rsync|nc|ssh|ftp)\s", script)
+    yield "toplama betiği eski kanıtın üzerine yazmaz", 'if [ -e "$OUT" ]' in script
+    bash = shutil.which("bash")
+    if bash:
+        yield "toplama betiği sözdizimi geçerli", subprocess.run([bash, "-n", str(P("tools") / "ir_collect.sh")]).returncode == 0
+    # Gerçek çalıştırma root ister: CI'da (Linux, parolasız sudo) yapılır, yerelde atlanır.
+    if sys.platform.startswith("linux") and subprocess.run(["sudo", "-n", "true"], capture_output=True).returncode == 0:
+        out = Path(tempfile.mkdtemp()) / "kanit"
+        suspicious = out.parent / "supheli.sh"
+        suspicious.write_text("#!/bin/sh\necho test\n", encoding="utf-8")
+        run = subprocess.run(["sudo", "-n", "bash", str(P("tools") / "ir_collect.sh"), str(out),
+                              "2026-01-01 00:00", "2026-01-02 00:00", str(suspicious)], capture_output=True)
+        files = set(subprocess.run(["sudo", "-n", "ls", str(out)], capture_output=True, text=True).stdout.split())
+        yield "toplama betiği gerçek sistemde tüm dosyaları üretir", run.returncode == 0 and expected | {"supheli.sh.kanit"} <= files
+        yield "toplama betiğinin manifesti doğrulanır", subprocess.run(
+            ["sudo", "-n", "sh", "-c", f"cd '{out}' && sha256sum -c --quiet MANIFEST.sha256"]).returncode == 0
+        subprocess.run(["sudo", "-n", "rm", "-rf", str(out.parent)])
+
+
 def settings_checks():
     """.claude/settings.json: sandbox ve yazma yasakları paths.json ile uyumlu mu: (açıklama, sonuç)."""
     settings = govlib.load_json(ROOT / ".claude" / "settings.json")
@@ -602,6 +633,10 @@ def main():
 
     print("== Bulut oturumu ==")
     for label, ok in cloud_checks():
+        report(ok, label)
+
+    print("== Kanıt toplama betiği ==")
+    for label, ok in ir_collect_checks():
         report(ok, label)
 
     print(f"\nSonuç: {failures} başarısız" if failures else "\nSonuç: tüm testler geçti")
