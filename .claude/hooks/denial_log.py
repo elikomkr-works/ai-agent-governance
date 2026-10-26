@@ -27,6 +27,12 @@ FALLBACK_MARKERS = (
     ("The user doesn't want to proceed with this tool use", "user"),
 )
 ID_RE = re.compile(r"tool_use_id=(\S+)")
+# İzin kuralındaki araç adı hangi araçları kapsar (Claude Code: Edit kuralları tüm yazma araçlarına uygulanır).
+RULE_TOOLS = {"Edit": {"Edit", "Write", "MultiEdit", "NotebookEdit"}, "Read": {"Read", "Grep", "Glob"}}
+RULE_RE = re.compile(r"^(\w+)(?:\((.*)\))?$")
+# Transcript yalnızca kaynağı söyler (rule:projectSettings); kuralın kendisini bu dosyalardan buluruz.
+SETTINGS_FILES = (("projectSettings", ".claude/settings.json"), ("localSettings", ".claude/settings.local.json"),
+                  ("userSettings", "~/.claude/settings.json"))
 
 
 def logged_ids(log):
@@ -62,6 +68,80 @@ def rejection(entry, block):
     if "[Policy Gate]" in text:
         return None
     return next((kind for marker, kind in FALLBACK_MARKERS if marker in text), None)
+
+
+def glob_re(pattern):
+    """gitignore tarzı desen → düzenli ifade (** dizinleri aşar, * aşmaz)."""
+    out, i = "", 0
+    while i < len(pattern):
+        if pattern.startswith("**/", i):
+            out, i = out + "(?:.*/)?", i + 3
+        elif pattern.startswith("**", i):
+            out, i = out + ".*", i + 2
+        elif pattern[i] == "*":
+            out, i = out + "[^/]*", i + 1
+        elif pattern[i] == "?":
+            out, i = out + "[^/]", i + 1
+        else:
+            out, i = out + re.escape(pattern[i]), i + 1
+    return out
+
+
+def norm(p):
+    p = str(p).replace("\\", "/")
+    return p.lower() if os.name == "nt" else p
+
+
+def path_matches(spec, file_path, root, base):
+    """Edit/Read kuralı yolu: //mutlak, ~/ev, /ayar dosyasının köküne göre, diğerleri her dizinde."""
+    target = Path(file_path).expanduser()
+    target = norm(target if target.is_absolute() else root / target)
+    if spec.startswith("//"):
+        anchor = spec[1:]
+    elif spec.startswith("~/"):
+        anchor = f"{norm(Path.home())}/{spec[2:]}"
+    elif spec.startswith("/"):
+        anchor = f"{norm(base)}{spec}"
+    else:
+        anchor = f"{norm(base)}/**/{spec}"
+    return re.fullmatch(glob_re(norm(anchor)), target) is not None
+
+
+def rule_matches(rule, tool, inp, root, base):
+    m = RULE_RE.match(rule.strip())
+    if not m or tool not in RULE_TOOLS.get(m.group(1), {m.group(1)}):
+        return False
+    spec = m.group(2)
+    if not spec:
+        return True
+    if m.group(1) in RULE_TOOLS:
+        fp = inp.get("file_path") or inp.get("notebook_path") or inp.get("path")
+        return bool(fp) and path_matches(spec, fp, root, base)
+    if m.group(1) == "Bash":
+        cmd = str(inp.get("command", "")).strip()
+        if spec.endswith(":*"):
+            return cmd == spec[:-2] or cmd.startswith(spec[:-2] + " ")
+        return re.fullmatch(".*".join(map(re.escape, spec.split("*"))), cmd) is not None
+    if spec.startswith("domain:"):
+        host = re.sub(r"^\w+://", "", str(inp.get("url", ""))).split("/")[0].split(":")[0]
+        return host == spec[7:] or host.endswith("." + spec[7:])
+    return False
+
+
+def matching_rule(code, tool, inp, root):
+    """rule:<kaynak> reddine yol açan deny kuralı; bulunamazsa ''. Önce koddaki kaynağa bakılır."""
+    source = code.split(":", 1)[1] if code.startswith("rule:") else ""
+    for _, rel in sorted(SETTINGS_FILES, key=lambda s: s[0] != source):
+        f = Path(rel).expanduser() if rel.startswith("~") else root / rel
+        base = Path.home() if rel.startswith("~") else root
+        try:
+            rules = (json.loads(f.read_text(encoding="utf-8")).get("permissions") or {}).get("deny") or []
+        except (OSError, ValueError, AttributeError):
+            continue
+        for rule in rules:
+            if isinstance(rule, str) and rule_matches(rule, tool, inp, root, base):
+                return rule
+    return ""
 
 
 def scan(transcript):
@@ -119,6 +199,8 @@ def handle(data, govlib, summarize):
             if tid in seen:
                 continue
             seen.add(tid)
+            rule = matching_rule(code, tool, inp, govlib.ROOT) if code.startswith("rule") else ""
+            code = f"{code} [kural: {rule}]" if rule else code
             record(govlib, summarize, data, tid, tool, inp, f"{code} @ {ts} — {text[:160]}")
             n += 1
         return n
