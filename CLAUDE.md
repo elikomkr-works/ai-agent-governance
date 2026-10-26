@@ -29,7 +29,7 @@ Görev → **Skill Router** → **Policy Gate** → **Executor** → **Validator
 | Executor | Uzman agent'lar (en az yetki: her birinin araç listesi sınırlı) | Platform tarafından |
 | Validator | `.claude/hooks/validator.py` (PostToolUse + Stop) | Sert: yapı kontrolü |
 | Reviewer | `reviewer` agent'ı | İçerik doğruluğu: bağımsız yeniden sayım |
-| Denetim kaydı | `governance/audit.jsonl` | Yalnızca ekleme; agent yazamaz |
+| Denetim kaydı | `governance/audit.jsonl` (canlı) + `governance/audit_archive/` (yayınlanan dilimler) | Yalnızca ekleme; agent yazamaz |
 
 ## Baş Agent protokolü (ana oturum için)
 1. **Planla:** Görevi alt görevlere böl. Eşleşme açık değilse `skill-scout` çağır. İlk mesajında şunu bildir:
@@ -39,7 +39,8 @@ Görev → **Skill Router** → **Policy Gate** → **Executor** → **Validator
    görev, girdi yolları, çalışma panosu klasörü, beklenen çıktı.
 4. **Yönlendir:** Çalışma panosundaki `YARDIM İSTEĞİ` satırlarını oku ve ilgili uzmana yeni görev olarak ver.
 5. **Denetlet:** Her rapor ve karantina kaydı için `reviewer` çağır. `DÜZELTME GEREKLİ` gelirse hataları yazara geri ver.
-   En fazla 2 tur dene; düzelmezse sonucu "doğrulanmadı" olarak sun.
+   En fazla 2 tur dene; düzelmezse sonucu "doğrulanmadı" olarak sun. Reviewer salt-okunurdur. Kararı sen yazarsın:
+   raporda `## Reviewer Kararı` bölümüne, karantina kaydında `reviewer:` alanına (`ONAY | DÜZELTME GEREKLİ | RED — tur <n> · <gerekçe>`). Panel kararı buradan okur.
 6. **Boşluk:** `skill-scout` bir SKILL BOŞLUĞU bildirirse `skill-smith` taslak hazırlasın. Etkinleştirmeye kullanıcı karar verir.
 7. **Sun:** Kısa özet ver. Her çıktı için yol, Reviewer kararı ve Doğrulama Durumu yazılsın.
 
@@ -67,7 +68,8 @@ Tüm klasör ve dosya yollarının tek kaynağı `governance/paths.json` dosyas�
 ## Komutlar
 - Hook testleri: `python3 tests/test_governance.py` (Windows'ta `python`)
 - Denetim paneli: `python3 tools/build_site.py` → `site/index.html` (salt-okunur, tarayıcıda açılır). CI, `main` dalında paneli GitHub Pages'e yayınlar.
-- Denetim kaydı bütünlüğü: `python3 tools/verify_audit.py [--base <git ref>]` (hash zinciri, yalnızca ekleme, her onaylı dosyanın Approve kaydı)
+- Denetim kaydı bütünlüğü: `python3 tools/verify_audit.py [--base <git ref>]` (hash zinciri, yalnızca ekleme, her onaylı dosyanın Approve kaydı; dilimler dahil)
+- Denetim kaydı yayını (yalnızca kullanıcı): `python3 tools/publish_audit.py` → canlı kaydın yayınlanmamış satırları `governance/audit_archive/` altına yeni dilim olarak yazılır. Betik git'e dokunmaz; commit/push/PR kullanıcıdadır.
 
 ## Katmanlı savunma
 1. Policy Gate (hook): komut metnini ve dosya yolunu denetler. Komut metnine baktığı için tek başına atlatılabilir.
@@ -75,6 +77,7 @@ Tüm klasör ve dosya yollarının tek kaynağı `governance/paths.json` dosyas�
    Bulut oturumunda (`CLAUDE_CODE_REMOTE=true`) Policy Gate ek olarak: ASK kararını DENY yapar (onaylayan yok) ve sandbox paketleri yoksa kabuk komutlarını reddeder.
    `git commit` ve `git push` sandbox dışında çalışır (commit imzası sandbox'tan ulaşılamayan yerel bir servise gider). Bu yüzden bulutta tek başına çalıştırılmalıdır: zincir (`&&`, `;`, `|`), `$(...)`, ters tırnak ve yönlendirme reddedilir; mesaj `-m "..."` veya `-F <dosya>` ile verilir. `.git/hooks` ve `.git/config` yazılamaz; bu yüzden sandbox içindeki git, config yazan işlemleri yapamaz (ör. `git checkout -b X origin/X` upstream yazamaz → `git checkout --no-track -b X origin/X` kullanın; upstream'i sandbox dışındaki `git push -u` yazar). Sandbox içinde yazılabilir geçici dizin `/tmp` değil `$TMPDIR`'dır.
 3. Denetim kaydı: hash zincirli, `session` ve `agent` alanlı; CI her push'ta zinciri ve yalnızca-ekleme kuralını git geçmişine karşı doğrular.
+   Canlı kayıt (`governance/audit.jsonl`) git'te izlenmez. Yayınlanan kısım `governance/audit_archive/<ts>_<yerel|bulut>_<logid>.jsonl` dilimlerindedir: dilimler silinemez/değiştirilemez, aynı kaynağın dilimleri sırayla birleşip tek zincir oluşturur. Dilimlere agent yazamaz (Gate `deny_write` + izin kuralı). Bulut oturumları dilim yayınlamaz: bulut kaydı oturumun rapor dalında kalır, dilimi kullanıcı yerelde üretir.
    İzin sisteminin hook'a ulaşmadan verdiği retler (deny kuralı, kullanıcı reddi, auto mode sınıflandırıcısı) `.claude/hooks/denial_log.py` ile `Permission` olayı olarak eklenir: PermissionDenied anında, diğerleri Stop/SubagentStop'ta transcript taranarak (`tool_use_id` ile tekrarsız). Kayıt zamanı retten sonradır; asıl zaman `reason` alanındadır.
 - Onay (yalnızca kullanıcı): `python3 tools/approve.py knowledge/quarantine/<dosya>.md`
 - Kapsama hedef eklemek: `governance/policy.json` → `scope.allowed_targets` (elle düzenleyin)

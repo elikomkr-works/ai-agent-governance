@@ -21,6 +21,8 @@ from pathlib import Path
 REPORT_SECTIONS = ["Kapsam", "Bulgular", "Kanıt", "Doğrulama Durumu"]
 LABELS = ("[OLGU]", "[ÖNERİ]", "[DOĞRULANMAMIŞ]")
 VERDICTS = ("KABUL", "RED", "BELİRSİZ")
+# Reviewer kararı isteğe bağlıdır (eski kayıtlarda yok); varsa bu değerlerden biri olmalı.
+REVIEW_VERDICTS = ("DÜZELTME GEREKLİ", "ONAY", "RED", "BEKLİYOR")
 QUARANTINE_KEYS = ["kaynak", "erisim_tarihi", "durum", "ozet"]
 AGENT_STATUSES = {"ADAY", "KARANTINADA", "DOGRULAMADAN_GECTI", "REDDEDILDI", "YENIDEN_INCELENIYOR"}
 WEB_NOTICE = (
@@ -63,9 +65,17 @@ def check_report(text):
         errors.append("Kanıt bölümü boş; her [OLGU] için kaynak satırı/çıktısı gösterilmeli.")
 
     status = " ".join(sections["Doğrulama Durumu"])
-    if not any(word in status for word in VERDICTS):
+    if not find_verdict(status, VERDICTS):
         errors.append(f"Doğrulama Durumu {', '.join(VERDICTS)} değerlerinden birini içermeli.")
+    if "Reviewer Kararı" in sections and not find_verdict(" ".join(sections["Reviewer Kararı"]), REVIEW_VERDICTS):
+        errors.append(f"Reviewer Kararı {', '.join(REVIEW_VERDICTS)} değerlerinden birini içermeli.")
     return errors
+
+
+def find_verdict(text, choices):
+    """Metinde en önce geçen karar değeri veya ''. Gerekçede sonradan geçen değerler kararı değiştirmez."""
+    found = [(text.find(c), c) for c in choices if c in text]
+    return min(found)[1] if found else ""
 
 
 def parse_frontmatter(text):
@@ -92,6 +102,8 @@ def check_quarantine(text):
         errors.append("ONAYLANDI durumunu yalnızca kullanıcı verir (tools/approve.py).")
     elif status and status not in AGENT_STATUSES:
         errors.append(f"Geçersiz durum '{status}'. İzinli: {', '.join(sorted(AGENT_STATUSES))}.")
+    if meta.get("reviewer") and not find_verdict(meta["reviewer"], REVIEW_VERDICTS):
+        errors.append(f"reviewer alanı {', '.join(REVIEW_VERDICTS)} değerlerinden birini içermeli.")
     return errors
 
 
