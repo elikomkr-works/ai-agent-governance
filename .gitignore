@@ -3,6 +3,8 @@ __pycache__/
 .claude/settings.local.json
 # tools/build_site.py çıktısı; denetim kaydından her seferinde yeniden üretilir.
 site/
+# Canlı denetim kaydı; yayınlanan kısmı governance/audit_archive/ dilimlerindedir (tools/publish_audit.py).
+/governance/audit.jsonl
 # Agent çalışma panoları; geçici, sürüm kontrolü dışında.
 work/
 # Bulut sandbox'ının (bubblewrap) depo kökünde açtığı boş yer tutucular; yanlışlıkla

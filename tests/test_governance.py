@@ -471,8 +471,11 @@ def settings_checks():
     excluded = {c.split()[1] for c in sandbox.get("excludedCommands", [])}
     yield "sandbox dışı git komutları Gate kuralıyla aynı", excluded == policy_gate.GIT_UNSANDBOXED
     # .gitignore'daki sandbox yer tutucuları yönetişim dosyalarını gizlememeli.
+    # Canlı kayıt bilerek izlenmez; yayınlanan kısmı dilimlerdedir.
     governed = [".claude/settings.json", ".claude/hooks/policy_gate.py", ".claude/agents/reviewer.md",
-                R("audit_log"), R("policy"), R("reports") + "r.md", R("approved") + "a.md"]
+                R("audit_archive") + "d.jsonl", R("policy"), R("reports") + "r.md", R("approved") + "a.md"]
+    yield "canlı denetim kaydı git'te izlenmez", subprocess.run(
+        ["git", "check-ignore", "-q", "--no-index", R("audit_log")], cwd=ROOT).returncode == 0
     ignored = [p for p in governed
                if subprocess.run(["git", "check-ignore", "-q", "--no-index", p], cwd=ROOT).returncode == 0]
     yield "sandbox yer tutucuları yönetişim dosyalarını gizlemez", ignored == []
