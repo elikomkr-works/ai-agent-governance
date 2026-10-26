@@ -19,6 +19,7 @@ sys.path.insert(0, str(HOOKS))
 import govlib  # noqa: E402
 import policy_gate  # noqa: E402
 import validator  # noqa: E402
+import denial_log  # noqa: E402
 
 sys.path.insert(0, str(govlib.path("tools")))
 import build_site  # noqa: E402
@@ -418,6 +419,16 @@ def denial_checks():
         yield "kayıtta araç, girdi ve gerekçe kodu var", (
             t1.get("event") == "Permission" and t1.get("decision") == "deny" and t1.get("tool") == "Edit"
             and ".git/config" in t1.get("detail", "") and t1.get("reason", "").startswith("rule:projectSettings"))
+        yield "deny kuralı retlerinde eşleşen kural yazılır", "[kural: Edit(/.git/config)]" in t1.get("reason", "")
+        match = denial_log.matching_rule
+        yield "Edit kuralı Write çağrısını da kapsar", match(
+            "rule:projectSettings", "Write", {"file_path": str(ROOT / ".git/hooks/pre-commit")}, ROOT) == "Edit(/.git/hooks/**)"
+        yield "kural dışı yol için kural yazılmaz", match("rule:projectSettings", "Edit", {"file_path": "README.md"}, ROOT) == ""
+        rule = denial_log.rule_matches
+        yield "Bash önek ve joker kuralları eşleşir", (
+            rule("Bash(curl:*)", "Bash", {"command": "curl -s x"}, ROOT, ROOT)
+            and not rule("Bash(curl:*)", "Bash", {"command": "curlx"}, ROOT, ROOT)
+            and rule("Bash(git push*)", "Bash", {"command": "git push origin"}, ROOT, ROOT))
         run_hook("denial_log.py", stop, env)
         yield "tekrar taramada aynı ret ikinci kez yazılmaz", len(records()) == 3
         denied = {"hook_event_name": "PermissionDenied", "session_id": "s1", "tool_name": "Bash", "reason": "[Kural]"}
