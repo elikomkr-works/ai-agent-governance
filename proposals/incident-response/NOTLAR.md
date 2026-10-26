@@ -1,6 +1,6 @@
 # incident-response — taslak notları
 
-**Durum:** TASLAK, etkin değil. Hazırlayan: skill-smith · 2026-10-25
+**Durum:** 1. AŞAMA ETKİN (2026-10-26): Bash'siz agent + K-1 (`@evidence` deny_write) + K-5 (validator `_ir_` kontrolü); skill/agent `.claude/` altında, kayıtlar güncel, örnek kanıt `samples/ir-web01/`. 2. aşama (agent'a özel Bash izin listesi, K-2/K-3) bekliyor. İlk durum: TASLAK. Hazırlayan: skill-smith · 2026-10-25
 **Tetikleyen:** log-analyst yardım isteği (`work/2026-10-25_uctan-uca/log-analyst.md`) → skill-scout: SKILL BOŞLUĞU (host düzeyi olay müdahalesi / adli inceleme)
 
 ## Dosyalar ve hedef yerleri

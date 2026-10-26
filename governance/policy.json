@@ -28,7 +28,7 @@
   ],
   "paths": {
     "_not": "'@anahtar' değerleri governance/paths.json'daki yollara çözülür; klasör taşınınca koruma da onunla taşınır. .claude/ ve claude.md yerini Claude Code belirler.",
-    "deny_write": ["@approved", "@audit_log", "@audit_archive"],
+    "deny_write": ["@approved", "@audit_log", "@audit_archive", "@evidence"],
     "ask_write": ["@paths_file", "@governance", ".claude/", "claude.md", "@tools"]
   },
   "deny_commands": ["@approve_script"]

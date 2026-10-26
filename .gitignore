@@ -27,3 +27,5 @@ work/
 /.claude/routines
 /.claude/scheduled_tasks.json
 /.claude/workflows
+# Olay müdahalesi kanıtları (müşteri/host verisi); public repoya girmez. Örnek kanıt samples/ altındadır.
+/evidence/

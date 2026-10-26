@@ -28,6 +28,16 @@
       "ag_erisimi": true,
       "risk": "orta",
       "cikti": "@quarantine"
+    },
+    {
+      "name": "incident-response",
+      "amac": "Kullanıcının dışa aktardığı host kanıtlarını (crontab, systemd, authorized_keys, hesaplar/sudoers, SUID, ps/ss/last, şüpheli dosya kopyaları) salt-okunur inceleyip kalıcılık izlerini, IOC'leri ve zaman çizelgesini kanıtlı olay müdahale raporuna yazmak",
+      "tetikleyiciler": ["olay müdahalesi", "incident response", "adli inceleme", "forensics", "kalıcılık", "persistence", "crontab", "şüpheli betik", "ihlal", "IOC"],
+      "gerekli_girdi": ["kanıt klasörünün yerel yolu", "host adı"],
+      "ag_erisimi": false,
+      "risk": "orta",
+      "risk_gerekcesi": "Ağ erişimi yok, salt-okunur ve Bash'siz (1. aşama). Girdi zararlı olabilecek dosya kopyaları ve hassas host verisi içerir; kanıt klasörüne yazma Policy Gate ile yasak (@evidence). Bash, agent'a özel izin listesiyle 2. aşamada eklenecek.",
+      "cikti": "@reports"
     }
   ]
 }
