@@ -38,7 +38,7 @@ SYSTEM_DIRS = ["governance", "tools", "tests", "samples"]
 # approved'a .gitkeep konmaz: verify_audit oradaki her dosya için Approve kaydı ister; klasörü approve.py açar.
 DATA_DIRS = ["audit_archive", "reports", "quarantine"]
 NEVER_COPY = DATA_DIRS + ["approved", "proposals", "work", "site", "evidence"]
-PAGES_NOTE = "CI, `main` dalında paneli GitHub Pages'e yayınlar."
+PAGES_NOTE = "CI publishes the panel to GitHub Pages on `main`."
 
 
 def system_files():
@@ -62,7 +62,7 @@ def transform(rel, data):
     if rel == WORKFLOW:
         return strip_pages(data.decode("utf-8")).encode("utf-8")
     if rel == "CLAUDE.md":
-        note = "Bu müşteri reposunda panel yayınlanmaz; yalnızca yerelde açılır (bkz. MUSTERI.md)."
+        note = "In this customer repo the panel is not published; open it locally only (see MUSTERI.md)."
         return data.decode("utf-8").replace(PAGES_NOTE, note).encode("utf-8")
     return data
 
