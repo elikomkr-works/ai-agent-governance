@@ -108,7 +108,13 @@ def extract_targets(tokens):
 def mentions_path(command, prefix):
     """Komut, yolu bağımsız bir yol parçası olarak içeriyor mu? ('test_governance.py' sayılmaz)"""
     name = re.escape(prefix.rstrip("/"))
-    return re.search(rf"(^|[\s/'\"=]){name}($|[\s/'\";|&>])", command) is not None
+    if not prefix.endswith("/"):
+        return re.search(rf"(^|[\s/'\"=]){name}($|[\s/'\";|&>])", command) is not None
+    # Folder: inside an argument only 'name/...' counts; the bare name only as a whole argument
+    # ('cd evidence'), so the word in code or text (get('evidence')) is not a path.
+    if re.search(rf"(^|[\s/'\"=<>(]){name}/", command):
+        return True
+    return any(re.search(rf"(^|[/=<>]){name}/?$", t) for seg in segments(command) for t in tokenize(seg))
 
 
 def check_path_write(path, policy, v):
