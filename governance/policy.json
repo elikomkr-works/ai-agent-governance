@@ -31,5 +31,16 @@
     "deny_write": ["@approved", "@audit_log", "@audit_archive", "@evidence"],
     "ask_write": ["@paths_file", "@governance", ".claude/", "claude.md", "@tools"]
   },
-  "deny_commands": ["@approve_script"]
+  "deny_commands": ["@approve_script"],
+  "evidence_guard": {
+    "_not": "Kanıt klasörünü veya .kanit uzantılı dosyayı anan her kabuk komutu (ana oturum dahil) yalnızca bu araçlarla, zincirin her parçasında, yönlendirme ve ikame olmadan çalışır. Kanıt çalıştırılamaz.",
+    "dirs": ["@evidence"],
+    "markers": ["\\.kanit\\b"],
+    "allowed": ["sha256sum", "sha1sum", "md5sum", "get-filehash", "wc", "grep", "ls", "stat"]
+  },
+  "agent_shell": {
+    "_not": "Bu agent'ların kabuğu yalnızca listedeki araçlarla çalışır (hook verisindeki agent_type ile). Listede olmayan agent'lar kısıtlanmaz.",
+    "incident-responder": ["sha256sum", "sha1sum", "md5sum", "get-filehash", "wc", "grep", "ls", "stat"]
+  },
+  "restricted_syntax": ["$(", "`", "<(", ">(", ">", "<"]
 }

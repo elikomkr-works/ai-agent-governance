@@ -15,7 +15,7 @@ skill-scout  log-analyst  config-auditor  cve-researcher  reviewer  skill-smith
 (yetenek     (×N paralel) (×N paralel)    (×N paralel)   (bağımsız (yeni skill
  kaşifi)                                                  denetçi)  taslakları)
 ```
-Ek uzman: `incident-responder` (×N paralel, host kanıtı inceler; 1. aşama: Bash'siz, kanıt hash'lerini görev mesajında Baş Agent verir).
+Ek uzman: `incident-responder` (×N paralel, host kanıtı inceler; 2. aşama: Bash yalnızca hash/sayım araçlarıyla — `policy.json` → `agent_shell`; kanıt klasörüne dokunan her komut `evidence_guard` ile sınırlı).
 Uzman agent sayısında sınır yok; aynı agent'tan paralel birden çok kopya açılabilir.
 Platform sınırı: alt agent'lar kendi alt agent'larını açamaz. Bu yüzden tüm koordinasyon Baş Agent'tan geçer.
 Kayıt: `governance/agents_registry.json`. Tanımlar: `.claude/agents/*.md`.
