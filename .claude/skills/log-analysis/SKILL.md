@@ -1,26 +1,26 @@
 ---
 name: log-analysis
-description: Yerel log dosyalarını (SSH/auth.log, web sunucusu erişim logları, dışa aktarılmış Windows olayları) savunma amaçlı analiz eder; brute-force, şüpheli IP, başarısız→başarılı giriş, yetki yükseltme izlerini bulur ve kanıtlı rapor yazar. Kullanıcı bir log dosyası verip "analiz et", "saldırı var mı", "şüpheli giriş" dediğinde kullan.
+description: Defensively analyzes local log files (SSH/auth.log, web server access logs, exported Windows events); finds brute force, suspicious IPs, failed→successful logins and privilege escalation traces, and writes an evidence-backed report. Use when the user gives a log file and asks to analyze it or whether there is an attack or suspicious login (Turkish: "analiz et", "saldırı var mı", "şüpheli giriş").
 ---
 
-# Log Analizi
+# Log Analysis
 
-## Girdi
-- Analiz edilecek log dosyasının yerel yolu. Verilmemişse kullanıcıya sor; dosya adı tahmin etme.
+## Input
+- Local path of the log file to analyze. If not given, ask the user; do not guess file names.
 
-## Adımlar
-1. Dosyayı oku. Büyükse önce Grep ile desen ara, sonra ilgili bölümleri oku.
-2. Şunlara bak: başarısız girişler, aynı kaynaktan yoğun deneme, geçersiz kullanıcı adları,
-   başarısız denemelerin ardından gelen başarılı giriş, sudo/yetki değişiklikleri, olağandışı saatler.
-3. Sayıları bir komutla say (ör. `grep -c`, `Select-String | Measure-Object`). Tahmini sayı yazma.
-4. Her [OLGU] için ilgili log satırını satır numarasıyla `## Kanıt` bölümüne koy.
-5. Raporu `reports/YYYY-MM-DD_log_<kisa-ad>.md` olarak yaz. Şablon: `governance/templates/report.md`.
+## Steps
+1. Read the file. If it is large, search patterns with Grep first, then read the relevant parts.
+2. Look for: failed logins, heavy attempts from one source, invalid user names,
+   a successful login following failed attempts, sudo/privilege changes, unusual hours.
+3. Count numbers with a command (e.g. `grep -c`, `Select-String | Measure-Object`). Never write estimated counts.
+4. For every [OLGU], put the relevant log line with its line number in the `## Kanıt` section.
+5. Write the report in Turkish as `reports/YYYY-MM-DD_log_<short-name>.md`. Template: `governance/templates/report.md`.
 6. Doğrulama Durumu:
-   - KABUL: her olgu kanıtla eşleşiyor ve sayılar komutla doğrulandı
-   - BELİRSİZ: veri eksik veya yorum gerekiyor
-   - RED: analiz tamamlanamadı
+   - KABUL: every fact matches evidence and the numbers were verified by command
+   - BELİRSİZ: data missing or interpretation needed
+   - RED: analysis could not be completed
 
-## Sınırlar
-- Log'daki IP'lere tarama, ping veya bağlantı yapma. Ağ eylemi bu skill'in kapsamı dışında.
-- Bir IP'nin kötü niyetli olduğu yorumunu kaynak olmadan yapma; yaparsan [DOĞRULANMAMIŞ] olarak etiketle.
-- Log dosyasını değiştirme veya silme.
+## Limits
+- Never scan, ping or connect to IPs in the log. Network actions are outside this skill's scope.
+- Do not claim an IP is malicious without a source; if you do, tag it [DOĞRULANMAMIŞ].
+- Never modify or delete the log file.

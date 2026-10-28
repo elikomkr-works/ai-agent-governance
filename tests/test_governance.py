@@ -115,6 +115,18 @@ GATE_CASES = [
     ("PowerShell kanıt hash'i serbest", "PowerShell",
      {"command": "Get-FileHash -Algorithm SHA256 " + R("evidence").replace("/", "\\") + "web01\\x.sh.kanit"}, "pass"),
     ("kanıtı anmayan komut kısıtlanmaz", "Bash", {"command": "python tests/test_governance.py"}, "pass"),
+    ("klasöre adıyla cd kısıtlanır", "Bash", {"command": f"cd {R('evidence').rstrip('/')} && ./x"}, "deny"),
+    ("klasörü değişkene atama kısıtlanır", "Bash",
+     {"command": f"D={R('evidence').rstrip('/')}; bash $D/x"}, "deny"),
+    ("koddaki klasör adı da kısıtlanır", "Bash",
+     {"command": f"python -c \"import subprocess; subprocess.run(['bash','x.sh'], cwd='{R('evidence').rstrip('/')}')\""},
+     "deny"),
+    ("-c içinde klasöre kopyalama", "Bash", {"command": f"bash -c \"cp x.sh {R('evidence').rstrip('/')}\""}, "deny"),
+    ("klasör adına yapışık yönlendirme", "Bash", {"command": f"cp x.sh {R('evidence').rstrip('/')}<in.txt"}, "deny"),
+    ("klasör adı ikame içinde", "Bash", {"command": f"cp x $(echo {R('evidence').rstrip('/')})"}, "deny"),
+    ("klasör adı glob ile", "Bash", {"command": f"cp x.sh {R('evidence').rstrip('/')}*"}, "deny"),
+    ("PowerShell -Param:klasör", "PowerShell",
+     {"command": f"Copy-Item x.sh -Destination:{R('evidence').rstrip('/')}"}, "deny"),
 ]
 
 AGENT_SHELL_CASES = [
@@ -524,7 +536,7 @@ def ir_collect_checks():
     """tools/ir_collect.sh, skill'in beklenen kanıt tablosunu eksiksiz üretiyor mu: (açıklama, sonuç)."""
     script = (P("tools") / "ir_collect.sh").read_text(encoding="utf-8")
     skill = (ROOT / ".claude" / "skills" / "incident-response" / "SKILL.md").read_text(encoding="utf-8")
-    table = skill.split("### Beklenen kanıtlar", 1)[1].split("\n\n", 2)[1]
+    table = skill.split("### Expected evidence", 1)[1].split("\n\n", 2)[1]
     expected = set(re.findall(r"`([\w.]+\.(?:txt|sha256))`", "\n".join(
         line.split("|")[1] for line in table.splitlines() if line.startswith("| `"))))
     produced = set(re.findall(r"^run ([\w.]+\.txt) ", script, re.M)) | {"TOPLAMA_NOTU.txt", "MANIFEST.sha256"}

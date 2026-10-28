@@ -1,36 +1,36 @@
 ---
 name: config-audit
-description: Yapılandırma dosyalarını (sshd_config, nginx/apache, dışa aktarılmış firewall kuralları vb.) güvenlik kontrol listesine göre salt-okunur denetler ve sertleştirme önerileri içeren rapor yazar. Kullanıcı bir config dosyası verip "güvenli mi", "denetle", "hardening" dediğinde kullan.
+description: Audits configuration files (sshd_config, nginx/apache, exported firewall rules etc.) read-only against a security checklist and writes a report with hardening recommendations. Use when the user gives a config file and asks "is it secure", "audit it", "hardening" (Turkish: "güvenli mi", "denetle", "sertleştirme").
 ---
 
-# Yapılandırma Denetimi
+# Configuration Audit
 
-## Girdi
-- Yapılandırma dosyasının yerel yolu ve türü. Tür belli değilse dosya içeriğinden çıkar; emin değilsen sor.
+## Input
+- Local path and type of the configuration file. If the type is unclear, infer it from the content; if unsure, ask.
 
-## Adımlar
-1. Dosyayı oku. Yorum satırlarını (`#`) etkin ayar sayma; varsayılan değeri ayrıca not et.
-2. İlgili kontrol listesini uygula (aşağıda). Her madde için: mevcut değer, beklenen değer, satır numarası.
-3. Sonuçları yaz:
-   - Uyumsuzluk → `[OLGU]`
-   - Düzeltme önerisi → `[ÖNERİ]`
-   - Sürüme bağlı varsayılan değerler gibi doğrulanamayan konular → `[DOĞRULANMAMIŞ]`
-4. Raporu `reports/YYYY-MM-DD_config_<kisa-ad>.md` olarak yaz. Şablon: `governance/templates/report.md`.
+## Steps
+1. Read the file. Do not count comment lines (`#`) as active settings; note the default value separately.
+2. Apply the relevant checklist (below). For each item: current value, expected value, line number.
+3. Write the results:
+   - Non-compliance → `[OLGU]`
+   - Fix recommendation → `[ÖNERİ]`
+   - Unverifiable matters such as version-dependent defaults → `[DOĞRULANMAMIŞ]`
+4. Write the report in Turkish as `reports/YYYY-MM-DD_config_<short-name>.md`. Template: `governance/templates/report.md`.
 
-## Kontrol listesi — OpenSSH sshd_config
-| Ayar | Beklenen |
+## Checklist — OpenSSH sshd_config
+| Setting | Expected |
 |---|---|
-| PermitRootLogin | no (veya prohibit-password) |
+| PermitRootLogin | no (or prohibit-password) |
 | PasswordAuthentication | no |
 | PermitEmptyPasswords | no |
 | MaxAuthTries | 3–4 |
 | X11Forwarding | no |
 | PubkeyAuthentication | yes |
 | LoginGraceTime | ≤ 60 |
-| AllowUsers / AllowGroups | tanımlı |
+| AllowUsers / AllowGroups | defined |
 
-Başka dosya türleri için kontrol listesi henüz yok. Genel ilkelerle değerlendir ve bunu raporun Kapsam bölümünde belirt.
+No checklist exists yet for other file types. Assess them by general principles and state this in the report's Kapsam section.
 
-## Sınırlar
-- Dosyayı değiştirme. Bu skill yalnızca öneri üretir; değişikliği kullanıcı uygular.
-- Servisi yeniden başlatma, firewall kuralı değiştirme.
+## Limits
+- Do not modify the file. This skill only produces recommendations; the user applies changes.
+- Do not restart services or change firewall rules.

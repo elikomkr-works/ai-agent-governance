@@ -107,8 +107,10 @@ def extract_targets(tokens):
 
 def mentions_path(command, prefix):
     """Komut, yolu bağımsız bir yol parçası olarak içeriyor mu? ('test_governance.py' sayılmaz)"""
+    # Deliberately strict: the name in code or text also matches, because a string literal can be
+    # a real path (os.chdir('evidence')). Mentioning the name is cheap to avoid; a bypass is not.
     name = re.escape(prefix.rstrip("/"))
-    return re.search(rf"(^|[\s/'\"=]){name}($|[\s/'\";|&>])", command) is not None
+    return re.search(rf"(^|[\s/'\"=:(<>]){name}($|[\s/'\";|&<>)*])", command) is not None
 
 
 def check_path_write(path, policy, v):
