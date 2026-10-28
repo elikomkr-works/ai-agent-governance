@@ -1,19 +1,19 @@
 {
   "version": 1,
-  "_not": "Baş Agent yalnızca bu listedeki agent'ları çağırır. Listede olmayan agent çağrısı Policy Gate tarafından kullanıcı onayına düşer. 'yazar' alanındaki '@anahtar' governance/paths.json'daki klasördür. Sayı sınırı yoktur; aynı agent'tan paralel birden çok kopya açılabilir.",
+  "_note": "The Lead Agent only calls agents from this list. A call to an unlisted agent falls to user approval in the Policy Gate. '@key' in 'writes' is a folder in governance/paths.json. No count limit; several copies of one agent may run in parallel.",
   "head": {
-    "name": "bas-agent",
-    "rol": "Ana oturum. Görevi böler, uzmanlara dağıtır, yardım isteklerini yönlendirir, sonuçları denetçiye kontrol ettirir ve kullanıcıya sunar."
+    "name": "lead-agent",
+    "role": "Main session. Splits the task, dispatches to specialists, routes help requests, has results checked by the reviewer and presents them to the user."
   },
   "agents": [
-    {"name": "skill-scout", "rol": "Yetenek Kaşifi — görev → skill/agent/araç eşleştirmesi, skill boşluğu tespiti", "skills": [], "yazar": []},
-    {"name": "log-analyst", "rol": "Log Analisti", "skills": ["log-analysis"], "yazar": ["@reports", "@work"]},
-    {"name": "config-auditor", "rol": "Yapılandırma Denetçisi", "skills": ["config-audit"], "yazar": ["@reports", "@work"]},
-    {"name": "cve-researcher", "rol": "CVE Araştırmacısı", "skills": ["cve-research"], "yazar": ["@quarantine", "@work"]},
-    {"name": "incident-responder", "rol": "Olay Müdahale Analisti — host kanıtı, salt-okunur, Bash yalnızca hash/sayım (2. aşama, agent_shell)", "skills": ["incident-response"], "yazar": ["@reports", "@work"]},
-    {"name": "reviewer", "rol": "Bağımsız Denetçi — içerik doğruluğu, yeniden sayım", "skills": [], "yazar": []},
-    {"name": "skill-smith", "rol": "Skill Ustası — yeni skill/agent taslakları", "skills": [], "yazar": ["@proposals"]},
-    {"name": "Explore", "rol": "Yerleşik salt-okunur arama agent'ı", "skills": [], "yazar": []},
-    {"name": "Plan", "rol": "Yerleşik planlama agent'ı", "skills": [], "yazar": []}
+    {"name": "skill-scout", "role": "Capability Scout — task → skill/agent/tool matching, skill gap detection", "skills": [], "writes": []},
+    {"name": "log-analyst", "role": "Log Analyst", "skills": ["log-analysis"], "writes": ["@reports", "@work"]},
+    {"name": "config-auditor", "role": "Configuration Auditor", "skills": ["config-audit"], "writes": ["@reports", "@work"]},
+    {"name": "cve-researcher", "role": "CVE Researcher", "skills": ["cve-research"], "writes": ["@quarantine", "@work"]},
+    {"name": "incident-responder", "role": "Incident Response Analyst — host evidence, read-only, Bash limited to hash/count (stage 2, agent_shell)", "skills": ["incident-response"], "writes": ["@reports", "@work"]},
+    {"name": "reviewer", "role": "Independent Auditor — content accuracy, recount", "skills": [], "writes": []},
+    {"name": "skill-smith", "role": "Skill Smith — new skill/agent drafts", "skills": [], "writes": ["@proposals"]},
+    {"name": "Explore", "role": "Built-in read-only search agent", "skills": [], "writes": []},
+    {"name": "Plan", "role": "Built-in planning agent", "skills": [], "writes": []}
   ]
 }
