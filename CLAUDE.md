@@ -83,3 +83,4 @@ Tüm klasör ve dosya yollarının tek kaynağı `governance/paths.json` dosyas�
    İzin sisteminin hook'a ulaşmadan verdiği retler (deny kuralı, kullanıcı reddi, auto mode sınıflandırıcısı) `.claude/hooks/denial_log.py` ile `Permission` olayı olarak eklenir: PermissionDenied anında, diğerleri Stop/SubagentStop'ta transcript taranarak (`tool_use_id` ile tekrarsız). Kayıt zamanı retten sonradır; asıl zaman `reason` alanındadır.
 - Onay (yalnızca kullanıcı): `python3 tools/approve.py knowledge/quarantine/<dosya>.md`
 - Kapsama hedef eklemek: `governance/policy.json` → `scope.allowed_targets` (elle düzenleyin)
+- Müşteri reposu (yalnızca kullanıcı): `python3 tools/new_customer.py <müşteri-adı> <repo dışı hedef klasör>` → yalnızca sistem dosyaları (beyaz liste), boş veri klasörleri, Pages yayını olmayan CI ve `MUSTERI.md` kılavuzu. Repo private açılır; müşteri verisi bu public repoya girmez. Sistem güncellemesi: `--guncelle <klasör>` (veri, kılavuz ve kapsam korunur).
