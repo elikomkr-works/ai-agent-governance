@@ -186,6 +186,32 @@ def check_shell(command, policy, v, rel_path):
                 v.add("ask", f"Kapsam dışı adrese HTTP isteği: {', '.join(out)}.")
 
 
+def restrict_shell(command, allowed, syntax, v, why):
+    """Komut yalnızca izinli araçlardan oluşmalı: zincirin her parçasının ilk sözcüğü listede,
+    yönlendirme ve ikame yok. sudo/env gibi önekler de liste dışı sayılır."""
+    norm = command.replace("\\", "/").lower()
+    bad = [s for s in syntax if s in norm]
+    if bad:
+        v.add("deny", f"{why}: yönlendirme/ikame kullanılamaz ({' '.join(bad)}).")
+    for seg in segments(norm):
+        tokens = tokenize(seg)
+        name = tool_name(tokens[0]) if tokens else ""
+        if name not in allowed:
+            v.add("deny", f"{why}: '{name}' izinli değil. İzinli: {', '.join(allowed)}.")
+
+
+def check_restricted(command, agent, policy, v):
+    norm = command.replace("\\", "/").lower()
+    syntax = policy.get("restricted_syntax", [])
+    guard = policy.get("evidence_guard")
+    if guard and (any(mentions_path(norm, d) for d in guard["dirs"])
+                  or any(re.search(m, norm) for m in guard["markers"])):
+        restrict_shell(command, guard["allowed"], syntax, v, "Kanıta dokunan komut")
+    allowed = policy.get("agent_shell", {}).get(agent)
+    if isinstance(allowed, list):
+        restrict_shell(command, allowed, syntax, v, f"'{agent}' agent'ının kabuğu sınırlı")
+
+
 def evaluate(data, policy, skills, rel_path, agents=frozenset()):
     v = Verdict()
     tool = data.get("tool_name", "")
@@ -193,6 +219,7 @@ def evaluate(data, policy, skills, rel_path, agents=frozenset()):
 
     if tool in SHELL_TOOLS:
         check_shell(inp.get("command", ""), policy, v, rel_path)
+        check_restricted(inp.get("command", ""), str(data.get("agent_type") or ""), policy, v)
     elif tool in WRITE_TOOLS:
         path = inp.get("file_path") or inp.get("notebook_path") or ""
         check_path_write(rel_path(path), policy, v)

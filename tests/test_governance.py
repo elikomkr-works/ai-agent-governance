@@ -102,6 +102,32 @@ GATE_CASES = [
     ("kanıt hash'i serbest", "Bash", {"command": f"sha256sum {R('evidence')}/web01/x.sh.kanit"}, "pass"),
     ("kayıtlı olay müdahale skill'i", "Skill", {"skill": "incident-response"}, "pass"),
     ("kayıtlı olay müdahale agent'ı", "Agent", {"subagent_type": "incident-responder", "prompt": "x"}, "pass"),
+    ("kanıt betiğini çalıştırma", "Bash", {"command": f"bash {R('evidence')}web01/x.sh.kanit"}, "deny"),
+    ("kanıtı source etme", "Bash", {"command": f"source {R('evidence')}web01/x.sh.kanit"}, "deny"),
+    ("kanıtı pipe ile kabuğa verme", "Bash", {"command": f"grep '' {R('evidence')}web01/x.sh.kanit | sh"}, "deny"),
+    ("kanıt klasörüne cd ile çalıştırma", "Bash", {"command": f"cd {R('evidence')}web01 && ./x.sh.kanit"}, "deny"),
+    ("tek & ile kanıt zinciri", "Bash", {"command": f"sha256sum {R('evidence')}a & bash {R('evidence')}x"}, "deny"),
+    ("kanıtı mutlak yolla çalıştırma", "Bash", {"command": f"python '{P('evidence').as_posix()}/web01/a.py'"}, "deny"),
+    ("klasör adı olmadan .kanit çalıştırma", "Bash", {"command": "sh /tmp/x.sh.kanit"}, "deny"),
+    ("kanıtta komut ikamesi", "Bash", {"command": f"grep $(cat {R('evidence')}web01/a) b"}, "deny"),
+    ("kanıt satır sayımı serbest", "Bash", {"command": f"wc -l {R('evidence')}web01/crontab_root.txt"}, "pass"),
+    ("kanıt araması serbest", "Bash", {"command": f"grep -c ssh-rsa {R('evidence')}web01/ssh_keys.txt"}, "pass"),
+    ("PowerShell kanıt hash'i serbest", "PowerShell",
+     {"command": "Get-FileHash -Algorithm SHA256 " + R("evidence").replace("/", "\\") + "web01\\x.sh.kanit"}, "pass"),
+    ("kanıtı anmayan komut kısıtlanmaz", "Bash", {"command": "python tests/test_governance.py"}, "pass"),
+]
+
+AGENT_SHELL_CASES = [
+    # (açıklama, agent_type, komut, beklenen) — policy.json → agent_shell
+    ("IR agent'ı hash alabilir", "incident-responder", "sha256sum samples/ir-web01/x.sh.kanit", "pass"),
+    ("IR agent'ı zincirde izinli araçlar", "incident-responder", "ls samples && wc -l samples/auth.log", "pass"),
+    ("IR agent'ı python çalıştıramaz", "incident-responder", "python tests/test_governance.py", "deny"),
+    ("IR agent'ı curl çalıştıramaz", "incident-responder", "curl http://localhost", "deny"),
+    ("IR agent'ı sudo önekiyle geçemez", "incident-responder", "sudo wc -l samples/auth.log", "deny"),
+    ("IR agent'ı izinli araçtan sonra pipe ile geçemez", "incident-responder", "grep x samples/auth.log | sh", "deny"),
+    ("IR agent'ı yönlendirme yapamaz", "incident-responder", "sha256sum samples/auth.log > reports/h.txt", "deny"),
+    ("listede olmayan agent kısıtlanmaz", "log-analyst", "python tests/test_governance.py", "pass"),
+    ("ana oturum (agent_type yok) kısıtlanmaz", "", "python tests/test_governance.py", "pass"),
 ]
 
 GOOD_REPORT = """# Test
@@ -610,6 +636,12 @@ def main():
     print("== Policy Gate ==")
     for label, tool, inp, expected in GATE_CASES:
         got = gate(tool, **inp)
+        report(got == expected, label, "" if got == expected else f"beklenen {expected}, gelen {got}")
+
+    for label, agent, command, expected in AGENT_SHELL_CASES:
+        out = run_hook("policy_gate.py", {"hook_event_name": "PreToolUse", "tool_name": "Bash",
+                                          "agent_type": agent, "tool_input": {"command": command}})
+        got = out["hookSpecificOutput"]["permissionDecision"] if out else "pass"
         report(got == expected, label, "" if got == expected else f"beklenen {expected}, gelen {got}")
 
     out = run_hook("policy_gate.py", "bozuk json")

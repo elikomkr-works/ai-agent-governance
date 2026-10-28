@@ -84,6 +84,9 @@ def load_policy():
     policy = load_json(path("policy"))
     for group in ("deny_write", "ask_write"):
         policy["paths"][group] = [resolve(p) for p in policy["paths"][group]]
+    guard = policy.get("evidence_guard")
+    if guard:
+        guard["dirs"] = [resolve(d) for d in guard["dirs"]]
     # '@anahtar' komut kuralında betiğin dosya adına çözülür (ör. \bapprove\.py\b).
     policy["deny_commands"] = [
         rf"\b{re.escape(PurePosixPath(resolve(c)).name)}\b" if c.startswith("@") else c
