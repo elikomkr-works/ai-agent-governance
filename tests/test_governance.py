@@ -115,13 +115,18 @@ GATE_CASES = [
     ("PowerShell kanıt hash'i serbest", "PowerShell",
      {"command": "Get-FileHash -Algorithm SHA256 " + R("evidence").replace("/", "\\") + "web01\\x.sh.kanit"}, "pass"),
     ("kanıtı anmayan komut kısıtlanmaz", "Bash", {"command": "python tests/test_governance.py"}, "pass"),
-    ("koddaki klasör adı kanıt sayılmaz", "Bash",
-     {"command": f"cd x && python -c \"print(d.get('{R('evidence').rstrip('/')}'))\""}, "pass"),
-    ("metindeki klasör adı kanıt sayılmaz", "Bash",
-     {"command": f"echo 'see the {R('evidence').rstrip('/')} folder' && sed -n 1p a.txt"}, "pass"),
     ("klasöre adıyla cd kısıtlanır", "Bash", {"command": f"cd {R('evidence').rstrip('/')} && ./x"}, "deny"),
     ("klasörü değişkene atama kısıtlanır", "Bash",
      {"command": f"D={R('evidence').rstrip('/')}; bash $D/x"}, "deny"),
+    ("koddaki klasör adı da kısıtlanır", "Bash",
+     {"command": f"python -c \"import subprocess; subprocess.run(['bash','x.sh'], cwd='{R('evidence').rstrip('/')}')\""},
+     "deny"),
+    ("-c içinde klasöre kopyalama", "Bash", {"command": f"bash -c \"cp x.sh {R('evidence').rstrip('/')}\""}, "deny"),
+    ("klasör adına yapışık yönlendirme", "Bash", {"command": f"cp x.sh {R('evidence').rstrip('/')}<in.txt"}, "deny"),
+    ("klasör adı ikame içinde", "Bash", {"command": f"cp x $(echo {R('evidence').rstrip('/')})"}, "deny"),
+    ("klasör adı glob ile", "Bash", {"command": f"cp x.sh {R('evidence').rstrip('/')}*"}, "deny"),
+    ("PowerShell -Param:klasör", "PowerShell",
+     {"command": f"Copy-Item x.sh -Destination:{R('evidence').rstrip('/')}"}, "deny"),
 ]
 
 AGENT_SHELL_CASES = [
