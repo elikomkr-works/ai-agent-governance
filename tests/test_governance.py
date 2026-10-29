@@ -563,6 +563,33 @@ def ir_collect_checks():
         subprocess.run(["sudo", "-n", "rm", "-rf", str(out.parent)])
 
 
+def win_collect_checks():
+    """tools/win_collect.ps1, iki skill'in Windows kanıt tablolarını gizli veri toplamadan üretiyor mu."""
+    script = (P("tools") / "win_collect.ps1").read_text(encoding="utf-8")
+    skills = ROOT / ".claude" / "skills"
+    expected = set()
+    for f in (skills / "incident-response" / "windows.md", skills / "config-audit" / "windows-dc.md"):
+        rows = [line.split("|")[1] for line in f.read_text(encoding="utf-8").splitlines() if line.startswith("| `")]
+        expected |= set(re.findall(r"`([\w.]+\.(?:txt|csv|sha256))`", "\n".join(rows)))
+    produced = set(re.findall(r"^\s*(?:if .*\{ )?Save(?:Events)? '([\w.]+)'", script, re.M)) | {"TOPLAMA_NOTU.txt", "MANIFEST.sha256"}
+    yield "Windows betiği iki tablodaki kanıtların hepsini üretir", len(expected) >= 50 and expected <= produced
+    code = "\n".join(line for line in script.splitlines() if not line.lstrip().startswith("#"))
+    secret = re.search(r"DefaultPassword|ntds\.dit|lsass|reg save|procdump|comsvcs|-Properties \*|"
+                       r"-Properties[^|\n]*(ms-Mcs-AdmPwd|msLAPS-Password(?!ExpirationTime)|msLAPS-Encrypted)|"
+                       r"reg query \"\$cv\\Winlogon\"(?! /v)", code, re.I)
+    yield "Windows betiği gizli veri toplamaz", secret is None
+    yield "Windows betiği ağa çıkmaz", not re.search(
+        r"Invoke-WebRequest|Invoke-RestMethod|\biwr\b|Start-BitsTransfer|Net\.WebClient|New-PSSession|-ComputerName|\bcurl\b|\bwget\b", code, re.I)
+    yield "Windows betiği eski kanıtın üzerine yazmaz", "if (Test-Path -LiteralPath $Out)" in script
+    id_sets = [s.split(",") for s in re.findall(r"@\(([\d,\s]+)\)", code)]
+    yield "Windows betiği olay sorgusu başına en çok 23 kimlik kullanır", bool(id_sets) and max(map(len, id_sets)) <= 23
+    pwsh = shutil.which("pwsh")
+    if pwsh:
+        parse = ("$e=$null;$t=$null;[void][System.Management.Automation.Language.Parser]::ParseFile("
+                 f"'{P('tools') / 'win_collect.ps1'}',[ref]$t,[ref]$e);exit $e.Count")
+        yield "Windows betiği sözdizimi geçerli", subprocess.run([pwsh, "-NoProfile", "-Command", parse]).returncode == 0
+
+
 def customer_checks():
     """tools/new_customer.py müşteri reposuna yalnızca sistem dosyalarını taşıyor mu: (açıklama, sonuç)."""
     base = Path(tempfile.mkdtemp())
@@ -727,6 +754,8 @@ def main():
 
     print("== Kanıt toplama betiği ==")
     for label, ok in ir_collect_checks():
+        report(ok, label)
+    for label, ok in win_collect_checks():
         report(ok, label)
 
     print("== Müşteri reposu ==")
