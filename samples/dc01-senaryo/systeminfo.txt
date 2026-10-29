@@ -1,0 +1,10 @@
+Host Name:                 DC01
+OS Name:                   Microsoft Windows Server 2019 Standard
+OS Version:                10.0.17763 N/A Build 17763
+OS Configuration:          Primary Domain Controller
+System Boot Time:          3.10.2026, 04:12:55
+Time Zone:                 (UTC+03:00) Istanbul
+Domain:                    corp.local
+Hotfix(s):                 2 Hotfix(s) Installed.
+                           [01]: KB5000859
+                           [02]: KB5001342

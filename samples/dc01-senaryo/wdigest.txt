@@ -1,0 +1,2 @@
+HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\SecurityProviders\WDigest
+    UseLogonCredential    REG_DWORD    0x1

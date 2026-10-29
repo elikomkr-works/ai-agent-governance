@@ -1,0 +1,15 @@
+Get-ADGroupMember "Domain Admins" | Select Name,SamAccountName
+Name           SamAccountName
+----           --------------
+Administrator  Administrator
+Ahmet Yilmaz   ahmet.yilmaz
+Mehmet Kaya    mehmet.kaya
+svc_backup2    svc_backup2
+
+Get-ADGroupMember "Protected Users"
+(üye yok)
+
+Get-ADGroupMember "Enterprise Admins" | Select SamAccountName
+SamAccountName
+--------------
+Administrator

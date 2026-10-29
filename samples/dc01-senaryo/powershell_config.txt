@@ -1,0 +1,19 @@
+Get-ExecutionPolicy -List
+
+        Scope ExecutionPolicy
+        ----- ---------------
+MachinePolicy       Undefined
+   UserPolicy       Undefined
+      Process       Undefined
+  CurrentUser       Undefined
+ LocalMachine    Unrestricted
+
+HKLM\SOFTWARE\Policies\Microsoft\Windows\PowerShell\ScriptBlockLogging
+    EnableScriptBlockLogging    REG_DWORD    0x1
+HKLM\SOFTWARE\Policies\Microsoft\Windows\PowerShell\Transcription
+    (anahtar yok)
+
+Get-WindowsFeature PowerShell-V2
+Display Name                    Name            Install State
+------------                    ----            -------------
+    [X] Windows PowerShell 2.0 Engine  PowerShell-V2  Installed

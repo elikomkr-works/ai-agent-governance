@@ -1,0 +1,7 @@
+HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Terminal Server
+    fDenyTSConnections    REG_DWORD    0x0
+
+HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp
+    PortNumber    REG_DWORD    0xd3d
+    UserAuthentication    REG_DWORD    0x0
+    SecurityLayer    REG_DWORD    0x1

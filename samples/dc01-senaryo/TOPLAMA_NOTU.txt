@@ -1,0 +1,14 @@
+SENTETİK SENARYO VERİSİ — uydurmadır, gerçek bir sunucudan alınmamıştır.
+Amaç: yönetişim sistemindeki 4 ajanı (log, config, CVE, olay müdahale) uçtan uca denemek.
+Senaryo kaynağı: kullanıcının verdiği SOC uyarısı (ahmet.yilmaz, 02:17, 103.148.72.41, Domain Admins ekleme, Invoke-Mimikatz benzeri komut).
+Uyarıdaki "Vietnam" konum bilgisi SOC aracından gelir; bu veri setinde coğrafi konum kaynağı yoktur.
+
+Host: DC01 (corp.local etki alanı denetleyicisi)
+Toplayan: sistem yöneticisi (örnek)
+Toplama zamanı: 2026-10-27T06:40:00Z (yerel 09:40)
+Sunucu saat dilimi: (UTC+03:00) Istanbul — olay kayıtlarındaki TimeCreated yerel saattir, biçim GG.AA.YYYY SS:DD:ss
+Komutlar: yönetici PowerShell (Get-WinEvent, auditpol, reg query, Get-AD*, Get-ScheduledTask, Get-CimInstance, netstat, systeminfo, Get-HotFix, Get-FileHash)
+Olay kayıtları Get-WinEvent sırasıyla, en yeni olay en üstte. Message alanındaki satır sonları " | " ile birleştirildi.
+Aktarım: USB ile yönetici iş istasyonuna, oradan proje klasörüne
+Normal profil (SOC): ahmet.yilmaz yalnızca İstanbul ofisinden (10.20.0.0/16) ve mesai saatlerinde (08:30–18:30) giriş yapar.
+Eksik: bellek imajı alınmadı; Sysmon kurulu değil; güvenlik duvarı/VPN kayıtları toplanmadı.

