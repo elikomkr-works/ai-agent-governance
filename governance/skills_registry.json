@@ -13,9 +13,9 @@
     },
     {
       "name": "config-audit",
-      "purpose": "Audit configuration files read-only against a security checklist",
-      "triggers": ["sshd_config", "yapılandırma", "config", "sertleştirme", "hardening"],
-      "required_input": ["local path of the config file"],
+      "purpose": "Audit configuration files and exported configuration outputs (incl. Windows Server / Active Directory domain controllers) read-only against a security checklist",
+      "triggers": ["sshd_config", "yapılandırma", "config", "sertleştirme", "hardening", "Active Directory", "etki alanı denetleyicisi", "domain controller", "Windows Server", "GPO", "auditpol"],
+      "required_input": ["local path of the config file or of the folder with exported config outputs"],
       "network_access": false,
       "risk": "low",
       "output": "@reports"
@@ -31,12 +31,12 @@
     },
     {
       "name": "incident-response",
-      "purpose": "Review host evidence exported by the user (crontab, systemd, authorized_keys, accounts/sudoers, SUID, ps/ss/last, copies of suspicious files) read-only and write persistence traces, IOCs and a timeline into an evidence-backed incident response report",
-      "triggers": ["olay müdahalesi", "incident response", "adli inceleme", "forensics", "kalıcılık", "persistence", "crontab", "şüpheli betik", "ihlal", "IOC", "breach", "suspicious script"],
+      "purpose": "Review host evidence exported by the user (Linux: crontab, systemd, authorized_keys, accounts/sudoers, SUID, ps/ss/last; Windows / AD DC: scheduled tasks, services, autostart locations, WMI subscriptions, AD accounts and privileged groups, event log exports; copies of suspicious files) read-only and write persistence traces, IOCs and a timeline into an evidence-backed incident response report",
+      "triggers": ["olay müdahalesi", "incident response", "adli inceleme", "forensics", "kalıcılık", "persistence", "crontab", "şüpheli betik", "ihlal", "IOC", "breach", "suspicious script", "zamanlanmış görev", "scheduled task", "Run anahtarı", "etki alanı denetleyicisi", "domain controller"],
       "required_input": ["local path of the evidence folder", "host name"],
       "network_access": false,
       "risk": "medium",
-      "risk_reason": "No network access, read-only. Input contains possibly malicious file copies and sensitive host data; writing to the evidence folder is denied by the Policy Gate (@evidence). Bash is limited to hash/count tools for this agent (policy.json agent_shell, stage 2).",
+      "risk_reason": "No network access, read-only. Input contains possibly malicious file copies and sensitive host data (Windows: AD account lists, ACLs, event logs); writing to the evidence folder is denied by the Policy Gate (@evidence). Bash is limited to hash/count tools for this agent (policy.json agent_shell, stage 2).",
       "output": "@reports"
     }
   ]

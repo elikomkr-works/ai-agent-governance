@@ -1,0 +1,9 @@
+{
+  "name": "config-audit",
+  "purpose": "Audit configuration files and exported configuration outputs (incl. Windows Server / Active Directory domain controllers) read-only against a security checklist",
+  "triggers": ["sshd_config", "yapılandırma", "config", "sertleştirme", "hardening", "Active Directory", "etki alanı denetleyicisi", "domain controller", "Windows Server", "GPO", "auditpol"],
+  "required_input": ["local path of the config file or of the folder with exported config outputs"],
+  "network_access": false,
+  "risk": "low",
+  "output": "@reports"
+}
