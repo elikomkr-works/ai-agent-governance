@@ -220,8 +220,8 @@ def path_checks():
     policy = govlib.load_policy()
     refs = policy["paths"]["deny_write"] + policy["paths"]["ask_write"] + policy["deny_commands"]
     yield "politikada çözülmemiş @anahtar kalmaz", not any(r.startswith("@") for r in refs)
-    registry_refs = [s["cikti"] for s in govlib.load_json(P("skills_registry"))["skills"]]
-    registry_refs += [y for a in govlib.load_json(P("agents_registry"))["agents"] for y in a["yazar"]]
+    registry_refs = [s["output"] for s in govlib.load_json(P("skills_registry"))["skills"]]
+    registry_refs += [y for a in govlib.load_json(P("agents_registry"))["agents"] for y in a["writes"]]
     yield "reyestrlerdeki @anahtar'lar tanımlı", all(r[1:] in govlib.paths() for r in registry_refs if r.startswith("@"))
     for label, value in (("'..' ile dışarı çıkan", "../disari"), ("mutlak", "/etc"), ("sürücü harfli", "C:/x"),
                          ("ters bölülü", "a\\b"), ("boş", "")):

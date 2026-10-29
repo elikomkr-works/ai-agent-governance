@@ -15,5 +15,5 @@ Write to `proposals/<name>/`, in English:
 
 ## Rules
 - Never design offensive capabilities (exploits, password cracking, credential harvesting).
-- For skills needing network access set `ag_erisimi: true` and follow the scope rule.
+- For skills needing network access set `network_access: true` and follow the scope rule.
 - In your final message give the draft path and state that activation requires user approval.

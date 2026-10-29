@@ -1,43 +1,43 @@
 {
   "version": 1,
-  "_not": "Skill Router yalnızca bu listedeki skill'leri seçer. Listede olmayan skill çağrısı Policy Gate tarafından kullanıcı onayına düşer. 'cikti' alanındaki '@anahtar' governance/paths.json'daki klasördür.",
+  "_note": "The Skill Router only picks skills from this list. A call to an unlisted skill falls to user approval in the Policy Gate. '@key' in 'output' is a folder in governance/paths.json. Triggers stay bilingual because users write in Turkish.",
   "skills": [
     {
       "name": "log-analysis",
-      "amac": "Yerel log dosyalarında saldırı izlerini bulmak ve kanıtlı rapor yazmak",
-      "tetikleyiciler": ["log", "auth.log", "brute-force", "şüpheli giriş", "olay kaydı"],
-      "gerekli_girdi": ["log dosyasının yerel yolu"],
-      "ag_erisimi": false,
-      "risk": "dusuk",
-      "cikti": "@reports"
+      "purpose": "Find attack traces in local log files and write an evidence-backed report",
+      "triggers": ["log", "auth.log", "brute-force", "şüpheli giriş", "olay kaydı", "suspicious login", "event log"],
+      "required_input": ["local path of the log file"],
+      "network_access": false,
+      "risk": "low",
+      "output": "@reports"
     },
     {
       "name": "config-audit",
-      "amac": "Yapılandırma dosyalarını güvenlik kontrol listesine göre salt-okunur denetlemek",
-      "tetikleyiciler": ["sshd_config", "yapılandırma", "config", "sertleştirme", "hardening"],
-      "gerekli_girdi": ["yapılandırma dosyasının yerel yolu"],
-      "ag_erisimi": false,
-      "risk": "dusuk",
-      "cikti": "@reports"
+      "purpose": "Audit configuration files read-only against a security checklist",
+      "triggers": ["sshd_config", "yapılandırma", "config", "sertleştirme", "hardening"],
+      "required_input": ["local path of the config file"],
+      "network_access": false,
+      "risk": "low",
+      "output": "@reports"
     },
     {
       "name": "cve-research",
-      "amac": "CVE/güvenlik açığı bilgisini birincil kaynaklardan toplayıp karantinaya kaydetmek",
-      "tetikleyiciler": ["CVE", "güvenlik açığı", "zafiyet", "advisory", "yama"],
-      "gerekli_girdi": ["CVE kimliği veya ürün/sürüm"],
-      "ag_erisimi": true,
-      "risk": "orta",
-      "cikti": "@quarantine"
+      "purpose": "Collect CVE/vulnerability information from primary sources and record it in quarantine",
+      "triggers": ["CVE", "güvenlik açığı", "zafiyet", "advisory", "yama", "vulnerability", "patch"],
+      "required_input": ["CVE ID or product/version"],
+      "network_access": true,
+      "risk": "medium",
+      "output": "@quarantine"
     },
     {
       "name": "incident-response",
-      "amac": "Kullanıcının dışa aktardığı host kanıtlarını (crontab, systemd, authorized_keys, hesaplar/sudoers, SUID, ps/ss/last, şüpheli dosya kopyaları) salt-okunur inceleyip kalıcılık izlerini, IOC'leri ve zaman çizelgesini kanıtlı olay müdahale raporuna yazmak",
-      "tetikleyiciler": ["olay müdahalesi", "incident response", "adli inceleme", "forensics", "kalıcılık", "persistence", "crontab", "şüpheli betik", "ihlal", "IOC"],
-      "gerekli_girdi": ["kanıt klasörünün yerel yolu", "host adı"],
-      "ag_erisimi": false,
-      "risk": "orta",
-      "risk_gerekcesi": "Ağ erişimi yok, salt-okunur ve Bash'siz (1. aşama). Girdi zararlı olabilecek dosya kopyaları ve hassas host verisi içerir; kanıt klasörüne yazma Policy Gate ile yasak (@evidence). Bash, agent'a özel izin listesiyle 2. aşamada eklenecek.",
-      "cikti": "@reports"
+      "purpose": "Review host evidence exported by the user (crontab, systemd, authorized_keys, accounts/sudoers, SUID, ps/ss/last, copies of suspicious files) read-only and write persistence traces, IOCs and a timeline into an evidence-backed incident response report",
+      "triggers": ["olay müdahalesi", "incident response", "adli inceleme", "forensics", "kalıcılık", "persistence", "crontab", "şüpheli betik", "ihlal", "IOC", "breach", "suspicious script"],
+      "required_input": ["local path of the evidence folder", "host name"],
+      "network_access": false,
+      "risk": "medium",
+      "risk_reason": "No network access, read-only. Input contains possibly malicious file copies and sensitive host data; writing to the evidence folder is denied by the Policy Gate (@evidence). Bash is limited to hash/count tools for this agent (policy.json agent_shell, stage 2).",
+      "output": "@reports"
     }
   ]
 }
