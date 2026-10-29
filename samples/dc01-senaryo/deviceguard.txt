@@ -1,0 +1,5 @@
+Get-CimInstance -Namespace root\Microsoft\Windows\DeviceGuard -ClassName Win32_DeviceGuard
+
+SecurityServicesConfigured   : {0}
+SecurityServicesRunning      : {0}
+VirtualizationBasedSecurityStatus : 0

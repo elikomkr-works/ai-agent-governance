@@ -1,0 +1,11 @@
+Get-CimInstance Win32_Service | Select Name,StartMode,State,PathName
+Name             StartMode State   PathName
+----             --------- -----   --------
+ADWS             Auto      Running C:\Windows\ADWS\Microsoft.ActiveDirectory.WebServices.exe
+DNS              Auto      Running C:\Windows\system32\dns.exe
+Kdc              Auto      Running C:\Windows\System32\lsass.exe
+Netlogon         Auto      Running C:\Windows\system32\lsass.exe
+NTDS             Auto      Running C:\Windows\System32\lsass.exe
+TermService      Manual    Running C:\Windows\System32\svchost.exe -k NetworkService
+W32Time          Auto      Running C:\Windows\system32\svchost.exe -k LocalService
+WinDefend        Auto      Running "C:\ProgramData\Microsoft\Windows Defender\platform\4.18.2104.14-0\MsMpEng.exe"

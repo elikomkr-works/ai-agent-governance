@@ -1,0 +1,4 @@
+HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion
+    CurrentBuild    REG_SZ    17763
+    UBR    REG_DWORD    0x757
+    DisplayVersion    REG_SZ    1809

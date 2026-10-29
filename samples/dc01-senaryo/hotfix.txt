@@ -1,0 +1,4 @@
+Source        Description      HotFixID      InstalledBy          InstalledOn
+------        -----------      --------      -----------          -----------
+DC01          Update           KB5000859     NT AUTHORITY\SYSTEM  10.03.2021 00:00:00
+DC01          Security Update  KB5001342     NT AUTHORITY\SYSTEM  14.04.2021 00:00:00

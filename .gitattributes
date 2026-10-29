@@ -2,3 +2,5 @@
 *.sh text eol=lf
 # Örnek kanıt seti: MANIFEST.sha256 bayt bayt eşleşmeli, satır sonu dönüştürülmez.
 samples/ir-web01/** -text
+# Synthetic DC01 scenario set: same rule, MANIFEST must match byte for byte.
+samples/dc01-senaryo/** -text

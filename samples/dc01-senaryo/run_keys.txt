@@ -1,0 +1,10 @@
+reg query HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Run
+HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Run
+    SecurityHealth    REG_EXPAND_SZ    %windir%\system32\SecurityHealthSystray.exe
+    VMware User Process    REG_SZ    "C:\Program Files\VMware\VMware Tools\vmtoolsd.exe" -n vmusr
+
+reg query HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\RunOnce
+(değer yok)
+
+dir "C:\ProgramData\Microsoft\Windows\Start Menu\Programs\StartUp"
+(dosya yok)

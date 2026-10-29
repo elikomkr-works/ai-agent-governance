@@ -1,0 +1,8 @@
+Get-NetFirewallRule -DisplayGroup "Remote Desktop" | Get-NetFirewallAddressFilter
+
+DisplayName   : Remote Desktop - User Mode (TCP-In)
+Enabled       : True
+Profile       : Any
+Action        : Allow
+RemoteAddress : Any
+LocalAddress  : Any

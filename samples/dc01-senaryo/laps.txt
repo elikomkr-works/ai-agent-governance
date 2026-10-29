@@ -1,0 +1,3 @@
+Get-ADComputer DC01 -Properties ms-Mcs-AdmPwd,msLAPS-Password
+Get-ADComputer : One or more properties are invalid. Parameter name: ms-Mcs-AdmPwd
+(LAPS şeması etki alanında yok)

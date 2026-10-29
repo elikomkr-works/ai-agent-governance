@@ -1,0 +1,14 @@
+Get-ScheduledTask | Select TaskPath,TaskName,State,Author,Date  +  (Get-ScheduledTask).Actions
+TaskPath                                  TaskName                 State  Author                 Date
+--------                                  --------                 -----  ------                 ----
+\Microsoft\Windows\Defrag\               ScheduledDefrag          Ready  Microsoft Corporation
+\Microsoft\Windows\WindowsUpdate\        Scheduled Start          Ready  Microsoft Corporation
+\Microsoft\Windows\Server Manager\       ServerManager            Ready  Microsoft Corporation
+\                                        Yedekleme_Gunluk         Ready  CORP\mehmet.kaya       2023-06-12T10:15:00
+\Microsoft\Windows\                      UpdateCheck              Ready  CORP\ahmet.yilmaz      2026-10-27T02:38:14
+
+## Actions: \Yedekleme_Gunluk
+Execute   : C:\Scripts\backup.cmd
+## Actions: \Microsoft\Windows\UpdateCheck
+Execute   : powershell.exe
+Arguments : -nop -w hidden -enc VwByAGkAdABlAC0ATwB1AHQAcAB1AHQAIAAnAFMARQBOAFQARQBUAEkASwAgAE8AUgBOAEUASwAgAC0AIAB6AGEAcgBhAHIAcwBpAHoAIAB5AGUAcgAgAHQAdQB0AHUAYwB1ACcA

@@ -1,0 +1,22 @@
+System audit policy
+Category/Subcategory                      Setting
+Logon/Logoff
+  Logon                                   Success and Failure
+  Logoff                                  Success
+  Special Logon                           Success
+Account Logon
+  Credential Validation                   Success and Failure
+  Kerberos Service Ticket Operations      No Auditing
+  Kerberos Authentication Service         No Auditing
+Account Management
+  User Account Management                 Success and Failure
+  Security Group Management               Success
+DS Access
+  Directory Service Access                No Auditing
+  Directory Service Changes               No Auditing
+Privilege Use
+  Sensitive Privilege Use                 No Auditing
+Detailed Tracking
+  Process Creation                        Success
+Object Access
+  Other Object Access Events              Success

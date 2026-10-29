@@ -1,0 +1,9 @@
+HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Lsa
+    auditbasedirectories    REG_DWORD    0x0
+    crashonauditfail    REG_DWORD    0x0
+    disabledomaincreds    REG_DWORD    0x0
+    everyoneincludesanonymous    REG_DWORD    0x0
+    LmCompatibilityLevel    REG_DWORD    0x2
+    NoLmHash    REG_DWORD    0x1
+    restrictanonymous    REG_DWORD    0x0
+    restrictanonymoussam    REG_DWORD    0x1
