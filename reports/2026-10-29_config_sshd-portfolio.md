@@ -82,4 +82,4 @@ Uyumlu (1):
 KABUL — Tüm [OLGU] bulguları dosyadaki birebir satırlara veya yukarıdaki grep çıktılarına dayanıyor; 8 maddelik kontrol listesi sayımı tutarlı (Uyumlu 1 + Uyumsuz 7 = 8). Sürüme bağlı öneriler ayrıca [DOĞRULANMAMIŞ] olarak işaretlendi.
 
 ## Reviewer Kararı
-ONAY — tur 3 · Kullanıcının onayladığı ek turda satır 49 düzeltildi; reviewer 17 olgu ve 14 sayıyı kaynakla yeniden karşılaştırdı, yeni hata bulmadı.
+ONAY — tur 3 · Kullanıcının onayladığı ek turda satır 49 düzeltildi; reviewer 16 olgu ve 14 sayıyı kaynakla yeniden karşılaştırdı, yeni hata bulmadı. (2026-10-31: olgu sayısı 17 yazılmıştı; iki bağımsız yöntemle yeniden sayıldı, gerçek sayı 16 — 17. geçiş Doğrulama Durumu metnindeki anıştırma. Onay değişmedi.)
