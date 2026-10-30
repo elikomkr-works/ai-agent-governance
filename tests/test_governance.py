@@ -4,6 +4,8 @@
 Hook'lar gerçek süreç olarak çalıştırılır; denetim kaydı geçici dosyaya yazılır.
 Yollar governance/paths.json'dan okunur; testler de sabit yol yazmaz.
 """
+import contextlib
+import io
 import json
 import os
 import re
@@ -25,6 +27,7 @@ sys.path.insert(0, str(govlib.path("tools")))
 import build_site  # noqa: E402
 import verify_audit  # noqa: E402
 import new_customer  # noqa: E402
+import activate_proposal  # noqa: E402
 
 ENV = dict(os.environ, GOV_AUDIT_LOG=str(Path(tempfile.gettempdir()) / "gov_test_audit.jsonl"))
 # Hook vakaları yerel davranışı sınar; bulut kuralları cloud_checks() içinde ayrıca sınanır.
@@ -68,6 +71,10 @@ GATE_CASES = [
     ("yıkıcı komut", "Bash", {"command": "rm -rf build"}, "ask"),
     ("yıkıcı PowerShell", "PowerShell", {"command": "Remove-Item -Path tmp -Recurse"}, "ask"),
     ("onay betiğini çalıştırma", "Bash", {"command": f"python {R('approve_script')} {R('quarantine')}a.md"}, "deny"),
+    ("etkinleştirme betiğini çalıştırma", "Bash",
+     {"command": f"python {R('activate_script')} {R('proposals')}yeni-beceri"}, "deny"),
+    ("etkinleştirme betiğini deneme kipinde çalıştırma", "PowerShell",
+     {"command": f"python {R('activate_script')} {R('proposals')}yeni-beceri --deneme"}, "deny"),
     ("onaylı bilgiye yazma", "Write", {"file_path": str(P("approved") / "x.md")}, "deny"),
     ("onaylı bilgiye kabukla kopyalama", "Bash", {"command": f"cp a.md {R('approved')}a.md"}, "deny"),
     ("dosya adında 'governance' geçmesi yanlış alarm değil", "PowerShell",
@@ -663,6 +670,351 @@ def settings_checks():
     yield "sandbox yer tutucuları yönetişim dosyalarını gizlemez", ignored == []
 
 
+def frontmatter(text):
+    """'---' ile açılan ön bilgi bloğunu {anahtar: değer} olarak döndürür."""
+    if not text.startswith("---"):
+        return {}
+    body = text.split("---", 2)[1]
+    fields = {}
+    for line in body.splitlines():
+        m = re.match(r"^([a-z_]+):\s*(.*)$", line)
+        if m:
+            fields[m.group(1)] = m.group(2).strip()
+    return fields
+
+
+def fleet_checks():
+    """Agent reyestri ile .claude/agents/ tanımları arasında kayma var mı: (açıklama, sonuç).
+
+    Filo büyüdükçe en kolay bozulan yer burası: tanım dosyasına araç eklenir ama
+    reyestre yazılmaz, ya da reyestrdeki 'least privilege' iddiası dosyayla uyuşmaz.
+    """
+    registry = govlib.load_json(P("agents_registry"))["agents"]
+    entries = {a["name"]: a for a in registry}
+    files = {p.stem: frontmatter(p.read_text(encoding="utf-8")) for p in sorted((ROOT / ".claude" / "agents").glob("*.md"))}
+    policy = govlib.load_json(P("policy"))
+    agent_shell = {k: v for k, v in policy.get("agent_shell", {}).items() if not k.startswith("_")}
+    skills = govlib.registered_skills()
+
+    yield "reyestrdeki agent adları tekil", len(entries) == len(registry)
+    yield "her tanım dosyası reyestrde kayıtlı", set(files) <= set(entries)
+    yield "dosya adı ile tanımdaki ad aynı", all(f.get("name") == name for name, f in files.items())
+    yield "her tanımda açıklama var", all(f.get("description") for f in files.values())
+    builtin = {n for n, a in entries.items() if a.get("builtin")}
+    yield "yerleşik olmayan her agent'ın tanım dosyası var", set(entries) - builtin == set(files)
+    yield "yerleşik agent'lara araç yazılmaz", all(not entries[n]["tools"] for n in builtin)
+
+    for name, fields in files.items():
+        entry = entries.get(name, {})
+        declared = {t.strip() for t in fields.get("tools", "").split(",") if t.strip()}
+        yield f"{name}: araç listesi reyestrle aynı", declared == set(entry.get("tools", []))
+        yield f"{name}: subagent yeni agent açamaz", not declared & {"Agent", "Task"}
+        yield f"{name}: yazma izni ile writes alanı tutarlı", ("Write" in declared) == bool(entry.get("writes"))
+        yield f"{name}: skill izni ile skills alanı tutarlı", ("Skill" in declared) == bool(entry.get("skills"))
+        yield f"{name}: reyestrdeki skill'ler kayıtlı", set(entry.get("skills", [])) <= skills
+        shell = entry.get("shell")
+        if "Bash" in declared:
+            yield f"{name}: kabuk genişliği beyan edilmiş", shell in ("limited", "broad")
+            yield f"{name}: 'limited' kabuk agent_shell listesiyle eşleşir", (shell == "limited") == (name in agent_shell)
+        else:
+            yield f"{name}: kabuksuz agent'a shell yazılmaz", shell is None and name not in agent_shell
+
+    yield "agent_shell'deki her ad reyestrde var", set(agent_shell) <= set(entries)
+    # Yetki genişletmesi: hiçbir uzman, Baş Agent'ın onay/yayın araçlarını taşımaz.
+    forbidden = {"WebFetch": {"skill-scout", "skill-smith"}}
+    yield "keşif agent'ları ağa çıkmaz", all(
+        "WebFetch" not in entries[n]["tools"] and "WebSearch" not in entries[n]["tools"]
+        for n in forbidden["WebFetch"] if n in entries)
+
+
+DRAFT_SKILL = """---
+name: test-beceri
+description: Test skill, only created by the test and deleted again.
+---
+
+# Test
+## Input
+- path
+## Steps
+1. read
+## Limits
+- read-only
+"""
+
+DRAFT_AGENT = """---
+name: test-uzmani
+description: Test specialist, only created by the test.
+tools: Read, Grep, Bash, Write, Skill
+---
+
+You are a test specialist.
+"""
+
+DRAFT_ENTRY = {
+    "skill": {"name": "test-beceri", "purpose": "test", "triggers": ["test"],
+              "required_input": ["path"], "network_access": False, "risk": "low", "output": "@reports"},
+    "agent": {"role": "Test specialist", "skills": ["test-beceri"],
+              "writes": ["@reports", "@work"], "shell": "limited"},
+    "agent_shell": ["grep", "wc"],
+}
+
+
+def write_draft(folder, entry=None, skill=DRAFT_SKILL, agent=DRAFT_AGENT):
+    folder.mkdir(parents=True, exist_ok=True)
+    (folder / "SKILL.md").write_text(skill, encoding="utf-8")
+    (folder / "agent.md").write_text(agent, encoding="utf-8")
+    (folder / "NOTES.md").write_text("why: test\n", encoding="utf-8")
+    (folder / "registry_entry.json").write_text(
+        json.dumps(entry or DRAFT_ENTRY, ensure_ascii=False, indent=2), encoding="utf-8")
+    return folder
+
+
+def factory_checks():
+    """activate_proposal: taslak doğrulaması, reyestr biçimi ve kuru çalıştırma: (açıklama, sonuç)."""
+    # Reyestrler elle biçimlendirilmiş; etkinleştirme dosyayı baştan yazdığı için
+    # üretici mevcut dosyaları birebir yeniden üretebilmeli, yoksa her yeni agent
+    # bütün dosyayı yeniden biçimlendirir ve diff okunmaz olur.
+    for key, array, one_line in (("agents_registry", "agents", True), ("skills_registry", "skills", False)):
+        text = P(key).read_text(encoding="utf-8")
+        rendered = activate_proposal.render_registry(json.loads(text), array, one_line=one_line)
+        yield f"{array} reyestri birebir yeniden üretilir", rendered == text
+
+    folder = govlib.path("proposals") / "_test_taslak"
+    saved_env = os.environ.get("GOV_AUDIT_LOG")
+    os.environ["GOV_AUDIT_LOG"] = ENV["GOV_AUDIT_LOG"]
+    try:
+        write_draft(folder)
+        draft = activate_proposal.read_draft(folder)
+        yield "geçerli taslak doğrulamayı geçer", activate_proposal.validate(draft) == []
+        yield "araç listesi tanım dosyasından alınır", draft["agent"]["tools"] == ["Read", "Grep", "Bash", "Write", "Skill"]
+        steps = " ".join(activate_proposal.plan(draft, update=False))
+        yield "plan skill, agent ve politika adımlarını sayar", all(
+            s in steps for s in ("test-beceri", "test-uzmani.md", "agent_shell"))
+
+        bad = [
+            ("yeni agent açan araç reddedilir", dict(agent=DRAFT_AGENT.replace("tools: Read", "tools: Agent, Read")), "izin verilmeyen araç"),
+            ("yazma izni writes'sız reddedilir", dict(entry={**DRAFT_ENTRY, "agent": {**DRAFT_ENTRY["agent"], "writes": []}}), "tutarsız"),
+            ("kabuk beyanı olmayan Bash reddedilir", dict(entry={**DRAFT_ENTRY, "agent": {k: v for k, v in DRAFT_ENTRY["agent"].items() if k != "shell"}}), "shell"),
+            ("agent_shell'siz 'limited' reddedilir", dict(entry={**DRAFT_ENTRY, "agent_shell": []}), "agent_shell listesi gerekir"),
+            ("agent_shell'de tarama aracı reddedilir", dict(entry={**DRAFT_ENTRY, "agent_shell": ["grep", "nmap"]}), "saldırı/tarama"),
+            ("SKILL.md ile kayıt adı farkı reddedilir", dict(skill=DRAFT_SKILL.replace("name: test-beceri", "name: baska-ad")), "aynı değil"),
+            ("tanımsız @anahtar reddedilir", dict(entry={**DRAFT_ENTRY, "skill": {**DRAFT_ENTRY["skill"], "output": "@yok"}}), "tanımlı değil"),
+        ]
+        for label, kwargs, expected in bad:
+            write_draft(folder, **kwargs)
+            errors = activate_proposal.validate(activate_proposal.read_draft(folder))
+            yield label, any(expected in e for e in errors)
+
+        # Kuru çalıştırma hiçbir dosyaya dokunmamalı.
+        write_draft(folder)
+        before = {k: P(k).read_text(encoding="utf-8") for k in ("skills_registry", "agents_registry", "policy")}
+        with contextlib.redirect_stdout(io.StringIO()):
+            code = activate_proposal.main([str(folder), "--deneme"])
+        after = {k: P(k).read_text(encoding="utf-8") for k in before}
+        yield "deneme kipi 0 döner", code == 0
+        yield "deneme kipi hiçbir dosyayı değiştirmez", before == after
+        yield "deneme kipi skill klasörü açmaz", not (ROOT / ".claude" / "skills" / "test-beceri").exists()
+
+        # upsert: aynı ad iki kez eklenemez, --guncelle ile üzerine yazılır.
+        reg = {"agents": [{"name": "a", "role": "eski"}]}
+        yield "aynı ad iki kez eklenemez", raises(
+            lambda: activate_proposal.upsert(reg, "agents", {"name": "a"}, update=False), ValueError)
+        activate_proposal.upsert(reg, "agents", {"name": "a", "role": "yeni"}, update=True)
+        yield "--guncelle kaydı değiştirir", reg["agents"] == [{"name": "a", "role": "yeni"}]
+        activate_proposal.upsert(reg, "agents", {"name": "b"}, update=False)
+        yield "yeni ad listeye eklenir", len(reg["agents"]) == 2
+    finally:
+        shutil.rmtree(folder, ignore_errors=True)
+        if saved_env is None:
+            os.environ.pop("GOV_AUDIT_LOG", None)
+        else:
+            os.environ["GOV_AUDIT_LOG"] = saved_env
+
+
+def factory_e2e_checks():
+    """Tam etkinleştirme, geçici bir repo kopyasında uçtan uca: (açıklama, sonuç).
+
+    Gerçek repoya yazmadan sınanır: govlib.ROOT geçici klasöre çevrilir, böylece
+    reyestrler, politika ve .claude/ kopyaları orada oluşur.
+    """
+    tmp = Path(tempfile.mkdtemp(prefix="gov_fabrika_"))
+    saved = (govlib.ROOT, activate_proposal.ROOT, activate_proposal.AGENTS_DIR, activate_proposal.SKILLS_DIR)
+    try:
+        shutil.copytree(P("governance"), tmp / R("governance"), ignore=shutil.ignore_patterns("audit_archive"))
+        (tmp / R("proposals")).mkdir(parents=True)
+        govlib.ROOT = activate_proposal.ROOT = tmp
+        activate_proposal.AGENTS_DIR = tmp / ".claude" / "agents"
+        activate_proposal.SKILLS_DIR = tmp / ".claude" / "skills"
+
+        folder = write_draft(tmp / R("proposals") / "_test_taslak")
+        (folder / "windows-ek.md").write_text("# ek\n", encoding="utf-8")
+        before = {k: P(k).read_text(encoding="utf-8") for k in ("skills_registry", "agents_registry", "policy")}
+        done = activate_proposal.apply(activate_proposal.read_draft(folder), update=False)
+        yield "etkinleştirme skill, agent ve politikayı bildirir", len(done) == 3
+
+        skill_dir = activate_proposal.SKILLS_DIR / "test-beceri"
+        yield "SKILL.md kopyalanır", (skill_dir / "SKILL.md").is_file()
+        yield "ek dosyalar kopyalanır", (skill_dir / "windows-ek.md").is_file()
+        yield "NOTES.md kopyalanmaz", not (skill_dir / "NOTES.md").exists()
+        yield "agent tanımı kopyalanır", (activate_proposal.AGENTS_DIR / "test-uzmani.md").is_file()
+
+        after = {k: P(k).read_text(encoding="utf-8") for k in before}
+        for key in ("skills_registry", "agents_registry", "policy"):
+            yield f"{key} geçerli JSON kalır", isinstance(govlib.load_json(P(key)), dict)
+            # Etkinleştirme yalnızca ekler: eski satırların hiçbiri kaybolmaz.
+            old_lines = [ln for ln in before[key].splitlines() if ln.strip() not in ("{", "}", "[", "]")]
+            yield f"{key} yalnızca eklenerek değişir", all(
+                ln in after[key].splitlines() or ln.rstrip(",") in [x.rstrip(",") for x in after[key].splitlines()]
+                for ln in old_lines)
+        yield "politikaya tek satır eklenir", len(after["policy"].splitlines()) - len(before["policy"].splitlines()) == 1
+
+        agents = {a["name"]: a for a in govlib.load_json(P("agents_registry"))["agents"]}
+        skills = {s["name"] for s in govlib.load_json(P("skills_registry"))["skills"]}
+        policy = govlib.load_json(P("policy"))
+        yield "agent reyestre eklenir", "test-uzmani" in agents
+        yield "skill reyestre eklenir", "test-beceri" in skills
+        yield "reyestrdeki araçlar tanım dosyasıyla aynı", agents.get("test-uzmani", {}).get("tools") == [
+            "Read", "Grep", "Bash", "Write", "Skill"]
+        yield "agent_shell politikaya yazılır", policy["agent_shell"].get("test-uzmani") == ["grep", "wc"]
+        yield "mevcut agent_shell kaydı korunur", "incident-responder" in policy["agent_shell"]
+
+        draft = activate_proposal.read_draft(folder)
+        yield "aynı taslak ikinci kez eklenemez", raises(lambda: activate_proposal.apply(draft, update=False), ValueError)
+        activate_proposal.apply(activate_proposal.read_draft(folder), update=True)
+        names = [a["name"] for a in govlib.load_json(P("agents_registry"))["agents"]]
+        yield "--guncelle kopya kayıt bırakmaz", names.count("test-uzmani") == 1
+        policy = govlib.load_json(P("policy"))
+        yield "--guncelle agent_shell'i çoğaltmaz", policy["agent_shell"].get("test-uzmani") == ["grep", "wc"]
+    finally:
+        govlib.ROOT, activate_proposal.ROOT, activate_proposal.AGENTS_DIR, activate_proposal.SKILLS_DIR = saved
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+APPROVED_REPORT = GOOD_REPORT + "## Reviewer Kararı\nONAY — tur 1 · sayılar bağımsız yeniden sayıldı\n"
+SOURCE_REL = "reports/2026-10-30_log_test.md"
+
+GOOD_DELIVERABLE_EN = """---
+dil: en
+kaynak_rapor: """ + SOURCE_REL + """
+musteri: portföy örneği
+teslim_tarihi: 2026-10-30
+---
+
+# SSH login attempts — web01
+
+**Date:** 2026-10-30 · **Prepared by:** Security analyst · **Input:** auth.log, 54 lines
+
+## Summary
+- 11 failed password attempts from one source; none succeeded.
+- Most urgent: password authentication is enabled (High).
+
+**Labels:** `FACT` = read from your file · `FIX` = recommended change · `CHECK` = version dependent.
+
+## Scope
+- Input: auth.log, 54 lines.
+- Out of scope: no scan, no connection to your systems, no file changed.
+
+## Findings
+| # | Severity | Setting (line) | FACT | FIX |
+|---|---|---|---|---|
+| 1 | High | password login (2) | FACT — 11 failed attempts from 203.0.113.45. | Disable password authentication. |
+
+## Evidence
+Source lines (`auth.log:<line>`):
+2 `Failed password for root from 203.0.113.45`
+
+## Verification
+Every FACT is based on an exact file line above. An independent second review re-checked the numbers before delivery.
+"""
+
+GOOD_DELIVERABLE_TR = """---
+dil: tr
+kaynak_rapor: """ + SOURCE_REL + """
+musteri: portföy örneği
+teslim_tarihi: 2026-10-30
+---
+
+# SSH giriş denemeleri — web01
+
+**Tarih:** 2026-10-30 · **Hazırlayan:** Güvenlik analisti · **Girdi:** auth.log, 54 satır
+
+## Özet
+- Tek kaynaktan 11 başarısız parola denemesi; hiçbiri başarılı olmadı.
+
+**Etiketler:** `OLGU` = dosyanızdan okundu · `ÇÖZÜM` = önerilen değişiklik · `KONTROL` = sürüme bağlı.
+
+## Kapsam
+- Girdi: auth.log, 54 satır.
+
+## Bulgular
+| # | Önem | Ayar (satır) | OLGU | ÇÖZÜM |
+|---|---|---|---|---|
+| 1 | Yüksek | parola girişi (2) | OLGU — 203.0.113.45'ten 11 başarısız deneme. | Parola ile girişi kapatın. |
+
+## Kanıt
+2 `Failed password for root from 203.0.113.45`
+
+## Doğrulama
+Her OLGU yukarıdaki tam bir dosya satırına dayanır.
+"""
+
+
+def deliverable_checks():
+    """Müşteri teslimi doğrulaması: (açıklama, sonuç).
+
+    Teslim türetilmiş bir belgedir; kaynağı reviewer ONAY'ı almamışsa teslim de geçersizdir.
+    Kaynak rapor sözlükten okunur, diskten değil: testler reponun içeriğine bağlı kalmasın.
+    """
+    langs = govlib.load_json(P("deliverable_languages"))
+    sources = {SOURCE_REL: APPROVED_REPORT}
+
+    def check(text, srcs=None):
+        return validator.check_deliverable(text, (srcs if srcs is not None else sources).get, langs)
+
+    yield "geçerli İngilizce teslim geçer", check(GOOD_DELIVERABLE_EN) == []
+    # Türkçe teslim kendi '## Kapsam' / '## Bulgular' başlıklarını kullanır; sızma sayılmamalı.
+    yield "geçerli Türkçe teslim geçer", check(GOOD_DELIVERABLE_TR) == []
+    yield "frontmatter yok", check(GOOD_DELIVERABLE_EN.split("---\n", 2)[2]) != []
+    yield "tanımsız dil reddedilir", check(GOOD_DELIVERABLE_EN.replace("dil: en", "dil: xx")) != []
+    for key in ("musteri", "teslim_tarihi"):
+        yield f"'{key}' alanı zorunlu", check(re.sub(rf"(?m)^{key}:.*\n", "", GOOD_DELIVERABLE_EN)) != []
+    yield "teslim tarihi biçimi denetlenir", check(GOOD_DELIVERABLE_EN.replace("teslim_tarihi: 2026-10-30", "teslim_tarihi: 30.10.2026")) != []
+    yield "kaynak rapor yoksa teslim geçersiz", check(GOOD_DELIVERABLE_EN, {}) != []
+    yield "kaynak rapor rapor klasöründe olmalı", check(
+        GOOD_DELIVERABLE_EN.replace(SOURCE_REL, "work/taslak.md")) != []
+    # Asıl kural: onaysız veya düzeltme bekleyen rapordan müşteri belgesi üretilemez.
+    yield "reviewer kararı olmayan rapordan teslim üretilemez", check(
+        GOOD_DELIVERABLE_EN, {SOURCE_REL: GOOD_REPORT}) != []
+    yield "DÜZELTME GEREKLİ rapordan teslim üretilemez", check(
+        GOOD_DELIVERABLE_EN, {SOURCE_REL: GOOD_REPORT + "## Reviewer Kararı\nDÜZELTME GEREKLİ — tur 1\n"}) != []
+    yield "doğrulamadan geçmeyen rapordan teslim üretilemez", check(
+        GOOD_DELIVERABLE_EN, {SOURCE_REL: APPROVED_REPORT.replace("## Kanıt", "## Notlar")}) != []
+    yield "eksik bölüm yakalanır", check(GOOD_DELIVERABLE_EN.replace("## Evidence", "## Proof")) != []
+    yield "boş bulgular bölümü reddedilir", check(
+        re.sub(r"(?ms)^## Findings\n.*?\n## Evidence", "## Findings\n\n## Evidence", GOOD_DELIVERABLE_EN)) != []
+    yield "FACT etiketi olmayan teslim reddedilir", check(GOOD_DELIVERABLE_EN.replace("FACT", "Note")) != []
+    for marker in ("[OLGU]", "KABUL", "## Doğrulama Durumu"):
+        yield f"iç etiket sızması yakalanır: {marker}", check(
+            GOOD_DELIVERABLE_EN.replace("## Verification", f"## Verification\n{marker}")) != []
+
+    # Uçtan uca: hook gerçekten deliverables/ klasörüne bakıyor mu.
+    report = P("reports") / "_test_teslim_kaynak.md"
+    deliv = P("deliverables") / "_test_teslim.md"
+    deliv.parent.mkdir(parents=True, exist_ok=True)
+    payload = {"hook_event_name": "PostToolUse", "tool_name": "Write", "tool_input": {"file_path": str(deliv)}}
+    try:
+        report.write_text(APPROVED_REPORT, encoding="utf-8")
+        deliv.write_text(GOOD_DELIVERABLE_EN.replace(SOURCE_REL, govlib.rel_path(report)), encoding="utf-8")
+        yield "PostToolUse geçerli teslimi engellemez", run_hook("validator.py", payload) is None
+        deliv.write_text(GOOD_DELIVERABLE_EN.replace(SOURCE_REL, govlib.rel_path(report))
+                         .replace("## Verification", "## Doğrulama Durumu"), encoding="utf-8")
+        out = run_hook("validator.py", payload)
+        yield "PostToolUse bozuk teslimi engeller", bool(out) and out.get("decision") == "block"
+    finally:
+        report.unlink(missing_ok=True)
+        deliv.unlink(missing_ok=True)
+
+
 def main():
     sys.stdout.reconfigure(encoding="utf-8")
     failures = 0
@@ -756,6 +1108,20 @@ def main():
     for label, ok in ir_collect_checks():
         report(ok, label)
     for label, ok in win_collect_checks():
+        report(ok, label)
+
+    print("== Agent fabrikası ==")
+    for label, ok in factory_checks():
+        report(ok, label)
+    for label, ok in factory_e2e_checks():
+        report(ok, label)
+
+    print("== Agent filosu ==")
+    for label, ok in fleet_checks():
+        report(ok, label)
+
+    print("== Müşteri teslimi ==")
+    for label, ok in deliverable_checks():
         report(ok, label)
 
     print("== Müşteri reposu ==")

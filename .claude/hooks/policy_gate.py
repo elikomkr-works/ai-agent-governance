@@ -137,8 +137,9 @@ def check_shell(command, policy, v, rel_path):
     allowed = [a.lower() for a in policy["scope"]["allowed_targets"]]
 
     for pat in policy["deny_commands"]:
-        if re.search(pat, norm):
-            v.add("deny", "Onay betiği yalnızca kullanıcı tarafından elle çalıştırılır.")
+        m = re.search(pat, norm)
+        if m:
+            v.add("deny", f"'{m.group(0)}' yalnızca kullanıcı tarafından elle çalıştırılır.")
 
     writes = WRITE_MARKER.search(STDERR_REDIRECT.sub("", norm))
     if writes:

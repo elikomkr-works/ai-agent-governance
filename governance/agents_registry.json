@@ -1,19 +1,20 @@
 {
-  "version": 1,
-  "_note": "The Lead Agent only calls agents from this list. A call to an unlisted agent falls to user approval in the Policy Gate. '@key' in 'writes' is a folder in governance/paths.json. No count limit; several copies of one agent may run in parallel.",
+  "version": 2,
+  "_note": "The Lead Agent only calls agents from this list. A call to an unlisted agent falls to user approval in the Policy Gate. '@key' in 'writes' is a folder in governance/paths.json. No count limit; several copies of one agent may run in parallel. 'tools' must match the agent definition's frontmatter (.claude/agents/<name>.md) exactly; tests/test_governance.py checks the drift. 'shell' is required when Bash is in tools: 'limited' means policy.json -> agent_shell lists the allowed commands, 'broad' means the agent runs any non-denied command and the Policy Gate is its only limit. 'builtin' agents come from Claude Code and have no definition file.",
   "head": {
     "name": "lead-agent",
     "role": "Main session. Splits the task, dispatches to specialists, routes help requests, has results checked by the reviewer and presents them to the user."
   },
   "agents": [
-    {"name": "skill-scout", "role": "Capability Scout — task → skill/agent/tool matching, skill gap detection", "skills": [], "writes": []},
-    {"name": "log-analyst", "role": "Log Analyst", "skills": ["log-analysis"], "writes": ["@reports", "@work"]},
-    {"name": "config-auditor", "role": "Configuration Auditor", "skills": ["config-audit"], "writes": ["@reports", "@work"]},
-    {"name": "cve-researcher", "role": "CVE Researcher", "skills": ["cve-research"], "writes": ["@quarantine", "@work"]},
-    {"name": "incident-responder", "role": "Incident Response Analyst — host evidence, read-only, Bash limited to hash/count (stage 2, agent_shell)", "skills": ["incident-response"], "writes": ["@reports", "@work"]},
-    {"name": "reviewer", "role": "Independent Auditor — content accuracy, recount", "skills": [], "writes": []},
-    {"name": "skill-smith", "role": "Skill Smith — new skill/agent drafts", "skills": [], "writes": ["@proposals"]},
-    {"name": "Explore", "role": "Built-in read-only search agent", "skills": [], "writes": []},
-    {"name": "Plan", "role": "Built-in planning agent", "skills": [], "writes": []}
+    {"name": "skill-scout", "role": "Capability Scout — task → skill/agent/tool matching, skill gap detection", "skills": [], "writes": [], "tools": ["Read", "Glob", "Grep"]},
+    {"name": "log-analyst", "role": "Log Analyst", "skills": ["log-analysis"], "writes": ["@reports", "@work"], "tools": ["Read", "Grep", "Glob", "Bash", "Write", "Skill"], "shell": "broad"},
+    {"name": "config-auditor", "role": "Configuration Auditor", "skills": ["config-audit"], "writes": ["@reports", "@work"], "tools": ["Read", "Grep", "Glob", "Bash", "Write", "Skill"], "shell": "broad"},
+    {"name": "cve-researcher", "role": "CVE Researcher", "skills": ["cve-research"], "writes": ["@quarantine", "@work"], "tools": ["Read", "Glob", "Write", "WebSearch", "WebFetch", "Skill"]},
+    {"name": "incident-responder", "role": "Incident Response Analyst — host evidence, read-only, Bash limited to hash/count (stage 2, agent_shell)", "skills": ["incident-response"], "writes": ["@reports", "@work"], "tools": ["Read", "Grep", "Glob", "Write", "Skill", "Bash"], "shell": "limited"},
+    {"name": "deliverable-writer", "role": "Customer Deliverable Writer — approved report → customer document in the customer's language", "skills": ["deliverable"], "writes": ["@deliverables", "@work"], "tools": ["Read", "Grep", "Glob", "Write", "Skill"]},
+    {"name": "reviewer", "role": "Independent Auditor — content accuracy, recount", "skills": [], "writes": [], "tools": ["Read", "Grep", "Glob", "Bash", "WebFetch"], "shell": "broad"},
+    {"name": "skill-smith", "role": "Skill Smith — new skill/agent drafts", "skills": [], "writes": ["@proposals"], "tools": ["Read", "Glob", "Grep", "Write"]},
+    {"name": "Explore", "role": "Built-in read-only search agent", "skills": [], "writes": [], "tools": [], "builtin": true},
+    {"name": "Plan", "role": "Built-in planning agent", "skills": [], "writes": [], "tools": [], "builtin": true}
   ]
 }

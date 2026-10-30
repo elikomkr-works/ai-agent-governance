@@ -8,6 +8,8 @@
     "tools": "tools",
     "tests": "tests",
     "reports": "reports",
+    "deliverables": "deliverables",
+    "deliverable_templates": "governance/templates/deliverable",
     "quarantine": "knowledge/quarantine",
     "approved": "knowledge/approved",
     "samples": "samples",
@@ -22,8 +24,10 @@
     "agents_registry": "governance/agents_registry.json",
     "audit_log": "governance/audit.jsonl",
     "report_template": "governance/templates/report.md",
+    "deliverable_languages": "governance/deliverable_languages.json",
     "quarantine_template": "governance/templates/quarantine.md",
     "approve_script": "tools/approve.py",
+    "activate_script": "tools/activate_proposal.py",
     "panel_template": "tools/panel_template.html",
     "site_index": "site/index.html"
   }

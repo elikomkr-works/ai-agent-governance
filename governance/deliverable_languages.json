@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "_note": "Customer deliverable languages. A deliverable is the customer-facing document derived from a reviewer-approved internal report in @reports; the internal report and its labels stay Turkish (see CLAUDE.md), the deliverable is written in the customer's language. The Validator reads this table: 'sections' are the '## ' headings it requires, 'fact_label' must appear at least once, 'template' is the file in @deliverable_templates. Adding a language: add a block here plus the matching template file, and add a case to tests/test_governance.py; no hook code changes. Machine fields (dil, kaynak_rapor, musteri, teslim_tarihi) live in the deliverable's frontmatter and stay Turkish — they are traceability data, not customer prose, and the delivered file is rendered without them.",
+  "internal_markers": [
+    "[OLGU]", "[ÖNERİ]", "[DOĞRULANMAMIŞ]",
+    "## Kapsam", "## Bulgular", "## Kanıt", "## Doğrulama Durumu", "## Reviewer Kararı",
+    "KABUL", "BELİRSİZ", "İZ VAR", "İZ YOK", "KANIT YOK"
+  ],
+  "languages": {
+    "en": {
+      "name": "English",
+      "template": "en.md",
+      "sections": ["Summary", "Scope", "Findings", "Evidence", "Verification"],
+      "findings_section": "Findings",
+      "proof_section": "Evidence",
+      "fact_label": "FACT",
+      "action_label": "FIX",
+      "check_label": "CHECK"
+    },
+    "tr": {
+      "name": "Türkçe",
+      "template": "tr.md",
+      "sections": ["Özet", "Kapsam", "Bulgular", "Kanıt", "Doğrulama"],
+      "findings_section": "Bulgular",
+      "proof_section": "Kanıt",
+      "fact_label": "OLGU",
+      "action_label": "ÇÖZÜM",
+      "check_label": "KONTROL"
+    }
+  }
+}

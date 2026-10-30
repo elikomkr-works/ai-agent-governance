@@ -1,13 +1,14 @@
 """Validator — PostToolUse ve Stop hook'u.
 
-PostToolUse (Write/Edit): reports/ ve knowledge/quarantine/ altındaki dosyayı
-  kurallara göre kontrol eder; hata varsa agent'a düzeltmesini söyler.
+PostToolUse (Write/Edit): reports/, knowledge/quarantine/ ve deliverables/ altındaki
+  dosyayı kurallara göre kontrol eder; hata varsa agent'a düzeltmesini söyler.
 PostToolUse (WebFetch/WebSearch): internet içeriğinin veri olduğunu, talimat
   olmadığını hatırlatır.
 Stop: tüm rapor ve karantina kayıtlarını kontrol eder; geçmeyen varsa agent'ın
   işi "bitti" diye sunmasını bir kez engeller, ikinci denemede kullanıcıyı uyarır.
 
-Klasör yolları governance/paths.json'dan okunur (dirs.reports, dirs.quarantine).
+Klasör yolları governance/paths.json'dan okunur (dirs.reports, dirs.quarantine,
+dirs.deliverables). Teslim dilleri governance/deliverable_languages.json'dan gelir.
 
 Not: Validator yapıyı ve zorunlu alanları denetler; içeriğin anlamsal
 doğruluğunu garanti etmez.
@@ -24,6 +25,11 @@ VERDICTS = ("KABUL", "RED", "BELİRSİZ")
 # Reviewer kararı isteğe bağlıdır (eski kayıtlarda yok); varsa bu değerlerden biri olmalı.
 REVIEW_VERDICTS = ("DÜZELTME GEREKLİ", "ONAY", "RED", "BEKLİYOR")
 QUARANTINE_KEYS = ["kaynak", "erisim_tarihi", "durum", "ozet"]
+# Müşteri teslimi (dirs.deliverables): iç rapordan türetilen, müşteri dilinde belge.
+# Makine alanları frontmatter'da durur ve Türkçedir; müşteriye gönderilen biçimde görünmez.
+DELIVERABLE_KEYS = ["dil", "kaynak_rapor", "musteri", "teslim_tarihi"]
+DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+ITEM = re.compile(r"^\s*([-*]|\d+\.|\|)")
 # Olay müdahale raporları (incident-response skill'i) için ek yapı kontrolü.
 IR_REPORT = re.compile(r"_ir_[^/]*\.md$")
 PERSISTENCE_ITEMS = [f"K{i}" for i in range(1, 7)]
@@ -132,10 +138,96 @@ def check_quarantine(text):
     return errors
 
 
+def effective_markers(langs, lang):
+    """Teslimde bulunmaması gereken iç etiketler.
+
+    Dil kendi bölüm başlığı veya etiketi olarak aynı dizgiyi kullanıyorsa o dizgi
+    listeden düşer; böylece Türkçe teslim kendi '## Kapsam' başlığı yüzünden hata vermez,
+    ama köşeli parantezli iç etiketler ('[OLGU]') her dilde yasak kalır.
+    """
+    own = {f"## {s}" for s in lang["sections"]}
+    own |= {lang[k] for k in ("fact_label", "action_label", "check_label") if lang.get(k)}
+    return [m for m in langs.get("internal_markers", []) if m not in own]
+
+
+def check_deliverable(text, read_source, langs):
+    """Müşteri teslimi: kaynak raporu reviewer ONAY'ı almış mı, dil yapısı tam mı, iç etiket sızmış mı.
+
+    read_source(göreli yol) -> kaynak raporun metni ya da None (yoksa).
+    Teslim türetilmiş bir belgedir; kaynağı doğrulanmamışsa teslim de doğrulanmış sayılmaz.
+    """
+    meta = parse_frontmatter(text)
+    if meta is None:
+        return ["Teslim belgesi '---' ile başlayan bir ön bilgi (frontmatter) bloğu içermeli."]
+    errors = [f"'{k}' alanı eksik veya boş." for k in DELIVERABLE_KEYS if not meta.get(k)]
+    if meta.get("teslim_tarihi") and not DATE.match(meta["teslim_tarihi"]):
+        errors.append("teslim_tarihi YYYY-AA-GG biçiminde olmalı.")
+
+    code = meta.get("dil", "")
+    lang = langs["languages"].get(code)
+    if not lang:
+        errors.append(f"Tanımsız dil '{code}'. İzinli: {', '.join(sorted(langs['languages']))} "
+                      f"(yeni dil: governance/deliverable_languages.json).")
+        return errors
+
+    source = meta.get("kaynak_rapor", "")
+    if source:
+        if not source.startswith("reports/"):
+            errors.append(f"kaynak_rapor rapor klasöründe olmalı: '{source}'.")
+        else:
+            src = read_source(source)
+            if src is None:
+                errors.append(f"kaynak_rapor bulunamadı: '{source}'. Teslim var olan bir rapordan türetilir.")
+            else:
+                src_errors = check_report(src)
+                if src_errors:
+                    errors.append(f"kaynak rapor '{source}' doğrulamadan geçmiyor: {src_errors[0]}")
+                else:
+                    sections = split_sections(src)
+                    verdict = find_verdict(" ".join(sections.get("Reviewer Kararı", [])), REVIEW_VERDICTS)
+                    if verdict != "ONAY":
+                        errors.append(
+                            f"kaynak rapor '{source}' reviewer ONAY'ı almamış (şu an: {verdict or 'karar yok'}). "
+                            "Onaysız rapordan müşteri teslimi üretilemez.")
+
+    sections = split_sections(text)
+    for name in lang["sections"]:
+        if name not in sections:
+            errors.append(f"'## {name}' bölümü eksik ({lang['name']} teslim yapısı).")
+    findings = sections.get(lang["findings_section"])
+    if findings is not None and not any(ITEM.match(l) for l in findings):
+        errors.append(f"'## {lang['findings_section']}' bölümünde en az bir madde veya tablo satırı olmalı.")
+    proof = sections.get(lang["proof_section"])
+    if proof is not None and not any(l.strip() for l in proof):
+        errors.append(f"'## {lang['proof_section']}' bölümü boş; teslimdeki her sayı buradan doğrulanabilmeli.")
+    if lang["fact_label"] not in text:
+        errors.append(f"Teslimde en az bir '{lang['fact_label']}' etiketi olmalı (kanıta bağlı bulgu).")
+
+    leaked = [m for m in effective_markers(langs, lang) if m in text]
+    if leaked:
+        errors.append(f"İç rapor etiketi müşteri belgesine sızmış: {', '.join(leaked)} — "
+                      f"teslim tamamen {lang['name']} olmalı.")
+    return errors
+
+
+def deliverable_check(govlib):
+    """check_deliverable'ı proje dosyalarına bağlar; kaynak rapor diskten okunur."""
+    langs = govlib.load_json(govlib.path("deliverable_languages"))
+
+    def read_source(rel):
+        try:
+            return (govlib.ROOT / rel).read_text(encoding="utf-8")
+        except OSError:
+            return None
+
+    return lambda text: check_deliverable(text, read_source, langs)
+
+
 def governed_dirs(govlib):
     """Denetlenen klasörler (paths.json'dan): (karşılaştırma öneki, mutlak yol, kontrol)."""
     return [(govlib.rel(key).lower(), govlib.path(key), check)
-            for key, check in (("reports", check_report), ("quarantine", check_quarantine))]
+            for key, check in (("reports", check_report), ("quarantine", check_quarantine),
+                               ("deliverables", deliverable_check(govlib)))]
 
 
 def check_file(path, govlib):

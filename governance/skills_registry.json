@@ -30,6 +30,16 @@
       "output": "@quarantine"
     },
     {
+      "name": "deliverable",
+      "purpose": "Turn a reviewer-approved report into the customer-facing document in the customer's language",
+      "triggers": ["müşteri sürümü", "İngilizce rapor", "teslim", "customer version", "deliverable", "English report", "müşteriye gönder"],
+      "required_input": ["path of the approved report under @reports", "customer language code", "customer name"],
+      "network_access": false,
+      "risk": "low",
+      "risk_reason": "No network, no shell. Derives a document from an already verified report; writes only to @deliverables. The Validator refuses a deliverable whose source report lacks reviewer ONAY.",
+      "output": "@deliverables"
+    },
+    {
       "name": "incident-response",
       "purpose": "Review host evidence exported by the user (Linux: crontab, systemd, authorized_keys, accounts/sudoers, SUID, ps/ss/last; Windows / AD DC: scheduled tasks, services, autostart locations, WMI subscriptions, AD accounts and privileged groups, event log exports; copies of suspicious files) read-only and write persistence traces, IOCs and a timeline into an evidence-backed incident response report",
       "triggers": ["olay müdahalesi", "incident response", "adli inceleme", "forensics", "kalıcılık", "persistence", "crontab", "şüpheli betik", "ihlal", "IOC", "breach", "suspicious script", "zamanlanmış görev", "scheduled task", "Run anahtarı", "etki alanı denetleyicisi", "domain controller"],

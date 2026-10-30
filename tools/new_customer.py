@@ -36,7 +36,7 @@ FIXED_SYSTEM = [".claude/", ".github/", "CLAUDE.md", ".gitignore", ".gitattribut
 SYSTEM_DIRS = ["governance", "tools", "tests", "samples"]
 # Sistem klasörlerinin içinde kalsalar da veridir; kopyalanmaz, müşteride boş açılır.
 # approved'a .gitkeep konmaz: verify_audit oradaki her dosya için Approve kaydı ister; klasörü approve.py açar.
-DATA_DIRS = ["audit_archive", "reports", "quarantine"]
+DATA_DIRS = ["audit_archive", "reports", "quarantine", "deliverables"]
 NEVER_COPY = DATA_DIRS + ["approved", "proposals", "work", "site", "evidence"]
 PAGES_NOTE = "CI publishes the panel to GitHub Pages on `main`."
 

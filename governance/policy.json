@@ -31,7 +31,7 @@
     "deny_write": ["@approved", "@audit_log", "@audit_archive", "@evidence"],
     "ask_write": ["@paths_file", "@governance", ".claude/", "claude.md", "@tools"]
   },
-  "deny_commands": ["@approve_script"],
+  "deny_commands": ["@approve_script", "@activate_script"],
   "evidence_guard": {
     "_note": "Every shell command (main session included) that names the evidence folder or a .kanit file runs only with these tools, in every part of the chain, without redirection or substitution. Evidence is never executed.",
     "dirs": ["@evidence"],
