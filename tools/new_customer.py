@@ -100,6 +100,10 @@ gh repo create <repo-adı> --private --source . --push
 ```
 GitHub'da Settings → Pages kapalı kalsın. CI yalnızca testleri çalıştırır, panel yayınlanmaz.
 
+## Sipariş alımı
+`python tools/intake.py <hizmet> <paket> --siparis "{name}"` → `work/<tarih>_<hizmet>-<müşteri>/intake.md`.
+Zorunlu girdiler (dosyalar, sürümler, sunucu rolü) tamamlanmadan iş başlamaz; katalog `governance/services.json`.
+
 ## Kapsam
 `governance/policy.json` → `scope.allowed_targets` alanına yalnızca müşterinin **yazılı izin verdiği** hedefleri elle ekleyin.
 İzin belgesini repo dışında saklayın.

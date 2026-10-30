@@ -29,6 +29,7 @@ import verify_audit  # noqa: E402
 import new_customer  # noqa: E402
 import to_pdf  # noqa: E402
 import activate_proposal  # noqa: E402
+import intake  # noqa: E402
 
 ENV = dict(os.environ, GOV_AUDIT_LOG=str(Path(tempfile.gettempdir()) / "gov_test_audit.jsonl"))
 # Hook vakaları yerel davranışı sınar; bulut kuralları cloud_checks() içinde ayrıca sınanır.
@@ -1079,6 +1080,97 @@ def pdf_checks():
         to_pdf.show(Path(tempfile.gettempdir()) / "a.pdf")).is_absolute()
 
 
+def intake_checks():
+    """Hizmet kataloğu ve alım listesi: (açıklama, sonuç).
+
+    Katalog satışın tek kaynağıdır: fiyat, süre, sınır ve istenecek girdiler
+    yalnızca services.json'da durur. Testler o tablonun kendisiyle, skill/agent
+    reyestrleriyle ve üretilen alım dosyasıyla tutarlılığını sınar.
+    """
+    data = intake.load()
+    skills = {s["name"] for s in govlib.load_json(P("skills_registry"))["skills"]}
+    agents = {a["name"] for a in govlib.load_json(P("agents_registry"))["agents"]}
+    langs = govlib.load_json(P("deliverable_languages"))["internal_markers"]
+    order = ("basic", "standard", "premium")
+
+    yield "katalog en az bir hizmet tanımlar", bool(data["services"])
+    for key, svc in data["services"].items():
+        yield f"{key}: skill reyestrde", svc["skill"] in skills
+        yield f"{key}: agent reyestrde", svc["agent"] in agents
+        pkgs = svc["packages"]
+        yield f"{key}: paket adları basic/standard/premium", list(pkgs) == list(order)
+        prices = [pkgs[o]["price_usd"] for o in order]
+        yield f"{key}: fiyatlar artar", prices == sorted(prices) and len(set(prices)) == 3
+        days = [pkgs[o]["delivery_days"] for o in order]
+        yield f"{key}: teslim süresi kısalmaz", days == sorted(days)
+        for o in order:
+            pkg = pkgs[o]
+            yield f"{key}/{o}: alanlar tam", all(
+                k in pkg for k in ("title", "price_usd", "delivery_days", "revisions",
+                                   "limits", "includes", "excludes")) and bool(pkg["includes"])
+            # Sınır sayısı pakete göre küçülmemeli: üst paket daha azını kapsayamaz.
+            yield f"{key}/{o}: sınırlar pozitif", all(isinstance(v, int) and v >= 0 for v in pkg["limits"].values())
+        for field in ("config_files", "log_files", "hosts"):
+            seq = [pkgs[o]["limits"].get(field, 0) for o in order]
+            yield f"{key}: '{field}' sınırı daralmaz", seq == sorted(seq)
+        ids = [i["id"] for i in svc["intake"]]
+        yield f"{key}: alım kalemi adları tekil", len(ids) == len(set(ids))
+        yield f"{key}: en az bir zorunlu girdi", any(i.get("blocker") for i in svc["intake"])
+        for item in svc["intake"]:
+            yield f"{key}/{item['id']}: alanlar tam", all(k in item for k in ("id", "ask_en", "note_tr"))
+            yield f"{key}/{item['id']}: paket kısıtı tanımlı paketlerden", all(
+                p in pkgs for p in item.get("packages", []))
+        # Pakete bağlı kalem yalnızca o pakette sorulur; Basic'te sorulmaz.
+        only = [i for i in svc["intake"] if i.get("packages")]
+        for item in only:
+            asked = {o for o in order if item in intake.asks(svc, o)}
+            yield f"{key}/{item['id']}: yalnızca kendi paketinde sorulur", asked == set(item["packages"])
+
+    yield "bilinmeyen hizmet hata verir", raises(lambda: intake.pick(data, "yok", "basic"), ValueError)
+    yield "bilinmeyen paket hata verir", raises(
+        lambda: intake.pick(data, next(iter(data["services"])), "gold"), ValueError)
+
+    svc_key = "config-audit"
+    text = intake.intake_text(data, svc_key, "premium", "Örnek Müşteri", today="2026-10-30")
+    svc = data["services"][svc_key]
+    pkg = svc["packages"]["premium"]
+    yield "alım dosyası müşteri ve paketi yazar", "Örnek Müşteri" in text and pkg["title"] in text
+    yield "alım dosyası fiyat ve süreyi yazar", f"${pkg['price_usd']}" in text and f"{pkg['delivery_days']} gün" in text
+    yield "alım dosyası skill ve agent'ı yazar", svc["skill"] in text and svc["agent"] in text
+    blockers = [i["id"] for i in intake.asks(svc, "premium") if i.get("blocker")]
+    yield "zorunlu girdiler işaretlenebilir listede", all(f"- [ ] **{b}**" in text for b in blockers)
+    yield "istenmeyenler alım dosyasında", all(n in text for n in data["common"]["never"])
+    # Müşteriye giden mesaj Türkçe iç etiket taşımamalı: teslim kuralının alımdaki karşılığı.
+    msg = text.split("```")[1]
+    yield "müşteri mesajında iç etiket yok", not any(m in msg for m in langs)
+    yield "müşteri mesajı paket sınırını söyler", "This package covers:" in msg
+    basic = intake.intake_text(data, svc_key, "basic", "X", today="2026-10-30")
+    yield "üst pakete ait girdi alt pakette sorulmaz", "**logs**" not in basic
+
+    yield "sipariş klasörü iş panosu altında", intake.order_folder(
+        svc_key, "Acme GmbH", today="2026-10-30").parent == P("work")
+    yield "müşteri adı dosya adına uygun hale gelir", intake.order_folder(
+        svc_key, "Acme GmbH & Co.", today="2026-10-30").name == "2026-10-30_config-audit-acme-gmbh-co"
+
+    # CLI: dosyayı yazar, elle doldurulmuş olabileceği için üzerine yazmaz.
+    folder = intake.order_folder(svc_key, "_test_alim")
+    target = folder / "intake.md"
+    try:
+        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+            first = intake.main([svc_key, "basic", "--siparis", "_test_alim"])
+            again = intake.main([svc_key, "basic", "--siparis", "_test_alim"])
+            forced = intake.main([svc_key, "basic", "--siparis", "_test_alim", "--guncelle"])
+            bad = intake.main([svc_key, "gold", "--siparis", "_test_alim"])
+            no_pkg = intake.main([svc_key])
+        yield "sipariş alım dosyasını yazar", first == 0 and target.is_file()
+        yield "var olan alım dosyası korunur", again == 1
+        yield "--guncelle ile üzerine yazılır", forced == 0
+        yield "bilinmeyen paket CLI'da hata", bad == 1
+        yield "paket adı eksikse hata", no_pkg == 1
+    finally:
+        shutil.rmtree(folder, ignore_errors=True)
+
+
 def main():
     sys.stdout.reconfigure(encoding="utf-8")
     failures = 0
@@ -1182,6 +1274,10 @@ def main():
 
     print("== Agent filosu ==")
     for label, ok in fleet_checks():
+        report(ok, label)
+
+    print("== Müşteri alımı ==")
+    for label, ok in intake_checks():
         report(ok, label)
 
     print("== Müşteri teslimi ==")

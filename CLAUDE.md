@@ -106,8 +106,19 @@ Validator and tests match these strings exactly: `[OLGU]`, `[ÖNERİ]`, `[DOĞRU
 ## Folder paths
 The single source for all folder and file paths is `governance/paths.json`. Hooks, `tools/` scripts, tests and the panel read paths from it. `policy.json`, `skills_registry.json` and `agents_registry.json` refer to these paths with `@key` (e.g. `@approved`, `@work`). Paths in this file, skills and agent definitions are defaults; if `paths.json` says otherwise, it wins. Never hard-code a new path; use `govlib.path("<key>")`. `.claude/` and `CLAUDE.md` locations are fixed by Claude Code and are not in `paths.json`.
 
+## Customer intake
+What is sold, what each package includes and what the customer must send before work starts live in one table: `governance/services.json`. The Fiverr gig texts and the intake checklist are derived from it, never the other way round.
+
+- Services: `config-audit` ($20/$60/$150, 2/3/5 days) and `log-analysis` ($15/$45/$120, 1/2/4 days), three packages each with their own file limits, inclusions and exclusions.
+- `python3 tools/intake.py` prints the catalogue; `python3 tools/intake.py <service> <package>` the intake list; `--siparis "<customer>"` opens the order folder under `@work` and writes `intake.md` (checklist, package limits, and the English message to send the customer as is). `intake.md` is filled in by hand, so it is not overwritten; `--guncelle` forces it.
+- An intake item marked `blocker` is a required input. **Work does not start before every blocker is in hand**: the Lead Agent asks the customer (Lead Agent protocol, step 2) and does not guess. A missing optional input becomes a stated assumption in the report.
+- Package limits are hard: files beyond the limit are a package upgrade, quoted before the work, not a favour.
+- `common.never` is what is never requested or promised, in any package (server access, secrets, active scanning, offensive testing). It goes into the customer message verbatim.
+- Adding a service or package = a block in `services.json` plus a case in `tests/test_governance.py`; no code change. The "Müşteri alımı" tests check the catalogue against the skill and agent registries, so a service cannot name a skill or agent that does not exist.
+
 ## Commands
 - Hook tests: `python3 tests/test_governance.py` (`python` on Windows)
+- Customer intake: `python3 tools/intake.py [<service> <package>] [--siparis "<customer>"]` → catalogue / intake list / order folder
 - Deliverable PDF: `python3 tools/to_pdf.py deliverables/<file>.md` → PDF beside the Markdown
 - Audit panel: `python3 tools/build_site.py` → `site/index.html` (read-only, opens in a browser). CI publishes the panel to GitHub Pages on `main`.
 - Audit log integrity: `python3 tools/verify_audit.py [--base <git ref>]` (hash chain, append-only, an Approve record for every approved file; slices included)

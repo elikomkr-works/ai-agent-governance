@@ -1,0 +1,160 @@
+{
+  "version": 1,
+  "_note": "Service catalogue: the single source for what is sold, what each package includes and what the customer must send before work starts. tools/intake.py reads this table; the Fiverr gig texts and the customer intake checklist are derived from it, never the other way round. An intake item with 'blocker': true is a required input: without it the Lead Agent asks the customer and does not start (CLAUDE.md -> Lead Agent protocol, step 2). 'limits' are hard package limits; work beyond them is a package upgrade, not a favour. 'never' lists what is never requested or promised, in any package. Adding a service: a block here plus a case in tests/test_governance.py; no code change.",
+
+  "common": {
+    "never": [
+      "server access (no login, no agent, no remote session)",
+      "passwords, private keys, tokens or certificates",
+      "active scanning or any change on the customer's systems",
+      "offensive testing (password cracking, exploitation)"
+    ],
+    "outputs": [
+      "internal Turkish report in @reports (reviewer verdict ONAY required)",
+      "customer deliverable in @deliverables, in the customer's language",
+      "PDF of the deliverable (tools/to_pdf.py), produced only after ONAY"
+    ],
+    "data_handling": "Customer files live in that customer's private repo (tools/new_customer.py), never in the public system repo. Deleted on request after delivery."
+  },
+
+  "services": {
+    "config-audit": {
+      "name": "Server configuration security audit",
+      "skill": "config-audit",
+      "agent": "config-auditor",
+      "report_slug": "config",
+      "input_kind": "configuration files (sshd_config, nginx/Apache, firewall export)",
+      "packages": {
+        "basic": {
+          "title": "SSH Check",
+          "price_usd": 20,
+          "delivery_days": 2,
+          "revisions": 1,
+          "limits": {"config_files": 1, "log_files": 0, "hosts": 1},
+          "includes": [
+            "audit of 1 configuration file, read-only",
+            "every finding cites the exact config line",
+            "ready-to-apply fix per finding",
+            "independent reviewer check before delivery"
+          ],
+          "excludes": ["CVE check", "log review", "executive summary"]
+        },
+        "standard": {
+          "title": "Server Hardening",
+          "price_usd": 60,
+          "delivery_days": 3,
+          "revisions": 1,
+          "limits": {"config_files": 3, "log_files": 0, "hosts": 1},
+          "includes": [
+            "audit of up to 3 configuration files (SSH + web server + firewall)",
+            "CVE check of the reported software versions against NVD and vendor advisories",
+            "every finding cites the exact config line, with a fix",
+            "independent reviewer check before delivery"
+          ],
+          "excludes": ["log review", "executive summary"]
+        },
+        "premium": {
+          "title": "Full Review",
+          "price_usd": 150,
+          "delivery_days": 5,
+          "revisions": 2,
+          "limits": {"config_files": 5, "log_files": 2, "hosts": 1},
+          "includes": [
+            "audit of up to 5 configuration files",
+            "CVE check of the reported software versions",
+            "review of up to 2 log files (auth/access) alongside the configs",
+            "executive summary for non-technical readers",
+            "independent reviewer check before delivery"
+          ],
+          "excludes": []
+        }
+      },
+      "intake": [
+        {"id": "configs", "blocker": true,
+         "ask_en": "The configuration file(s) to audit, as attachments. Please remove passwords, keys and tokens first.",
+         "note_tr": "Paket dosya sınırını aşan gönderide fazlası işlenmez; paket yükseltmesi önerilir."},
+        {"id": "versions", "blocker": true,
+         "ask_en": "OS and software versions, e.g. Ubuntu 22.04, output of `ssh -V` and `nginx -v`.",
+         "note_tr": "CVE adımı sürüm olmadan yapılamaz; Basic'te bile raporun kapsamını belirler."},
+        {"id": "role", "blocker": true,
+         "ask_en": "What does this server do? (web, database, VPN/bastion, mail, ...)",
+         "note_tr": "Sertleştirme önerisi sunucunun roluyle çelişebilir; rol bilinmeden öneri yazılmaz."},
+        {"id": "constraints", "blocker": false,
+         "ask_en": "Anything that must stay as it is? (e.g. password login needed for a legacy app)",
+         "note_tr": "Yanıt yoksa kısıt yok varsayılır ve raporda bu varsayım yazılır."},
+        {"id": "logs", "blocker": false, "packages": ["premium"],
+         "ask_en": "Log files for the review (auth.log / access log), last 7-30 days.",
+         "note_tr": "Premium'da log yoksa müşteriye sorulur; gelmezse rapor yalnızca config kapsamıyla teslim edilir."}
+      ]
+    },
+
+    "log-analysis": {
+      "name": "Server log analysis for brute force and suspicious logins",
+      "skill": "log-analysis",
+      "agent": "log-analyst",
+      "report_slug": "log",
+      "input_kind": "log files (auth.log, web access log, Windows Security export)",
+      "packages": {
+        "basic": {
+          "title": "Quick Scan",
+          "price_usd": 15,
+          "delivery_days": 1,
+          "revisions": 1,
+          "limits": {"log_files": 1, "config_files": 0, "hosts": 1},
+          "includes": [
+            "1 log file scanned for brute force and suspicious logins",
+            "counts reproduced by command, with the command shown",
+            "every finding cites the exact log line",
+            "independent reviewer check before delivery"
+          ],
+          "excludes": ["IOC list", "event timeline", "executive summary"]
+        },
+        "standard": {
+          "title": "Full Log Review",
+          "price_usd": 45,
+          "delivery_days": 2,
+          "revisions": 1,
+          "limits": {"log_files": 1, "config_files": 0, "hosts": 1},
+          "includes": [
+            "1 log file, full review: failed-to-success chains, sudo use, unusual hours",
+            "IOC list (IP addresses and user names) for blocking",
+            "every finding cites the exact log line",
+            "independent reviewer check before delivery"
+          ],
+          "excludes": ["event timeline", "executive summary"]
+        },
+        "premium": {
+          "title": "Multi-Log + Timeline",
+          "price_usd": 120,
+          "delivery_days": 4,
+          "revisions": 2,
+          "limits": {"log_files": 3, "config_files": 0, "hosts": 3},
+          "includes": [
+            "up to 3 log files, correlated across sources",
+            "event timeline of the incident window",
+            "IOC list and executive summary",
+            "independent reviewer check before delivery"
+          ],
+          "excludes": []
+        }
+      },
+      "intake": [
+        {"id": "logs", "blocker": true,
+         "ask_en": "The log file(s) to analyse, as attachments. Please remove any secrets first.",
+         "note_tr": "Ekran görüntüsü ya da yapıştırılmış parça yeterli değil: satır sayısı ve sayımlar dosya üzerinden yeniden üretilir."},
+        {"id": "source", "blocker": true,
+         "ask_en": "Log type and source, e.g. Ubuntu 22.04 /var/log/auth.log, nginx access log, Windows Security .evtx export.",
+         "note_tr": "Biçim bilinmeden satır ayrıştırması tahmine döner."},
+        {"id": "window_tz", "blocker": true,
+         "ask_en": "The time window you care about (e.g. last 7 days) and the server's timezone.",
+         "note_tr": "Saat dilimi olmadan 'mesai dışı' bulgusu yazılamaz; yazıldıysa [DOĞRULANMAMIŞ] olur."},
+        {"id": "role", "blocker": false,
+         "ask_en": "What does this server do? (web, database, VPN/bastion, ...)",
+         "note_tr": "Beklenen trafiği ayırt etmek için; yoksa varsayım raporda yazılır."},
+        {"id": "known_good", "blocker": false,
+         "ask_en": "Any IP addresses or user accounts you already know are yours, so they are not flagged.",
+         "note_tr": "Gelmezse kendi adresleri de IOC listesine girebilir; teslimde bu sınır belirtilir."}
+      ]
+    }
+  }
+}

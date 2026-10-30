@@ -25,6 +25,7 @@
     "audit_log": "governance/audit.jsonl",
     "report_template": "governance/templates/report.md",
     "deliverable_languages": "governance/deliverable_languages.json",
+    "services": "governance/services.json",
     "quarantine_template": "governance/templates/quarantine.md",
     "approve_script": "tools/approve.py",
     "activate_script": "tools/activate_proposal.py",
