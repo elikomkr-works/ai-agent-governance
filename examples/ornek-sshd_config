@@ -1,0 +1,16 @@
+# Sample sshd_config for portfolio demo (synthetic, intentionally weak)
+Port 22
+Protocol 2
+PermitRootLogin yes
+PasswordAuthentication yes
+PermitEmptyPasswords yes
+PubkeyAuthentication yes
+X11Forwarding yes
+MaxAuthTries 10
+LoginGraceTime 120
+ClientAliveInterval 0
+AllowTcpForwarding yes
+LogLevel INFO
+UsePAM yes
+Ciphers aes128-cbc,3des-cbc,aes256-cbc
+MACs hmac-md5,hmac-sha1
