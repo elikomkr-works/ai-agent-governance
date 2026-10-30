@@ -27,6 +27,7 @@ sys.path.insert(0, str(govlib.path("tools")))
 import build_site  # noqa: E402
 import verify_audit  # noqa: E402
 import new_customer  # noqa: E402
+import to_pdf  # noqa: E402
 import activate_proposal  # noqa: E402
 
 ENV = dict(os.environ, GOV_AUDIT_LOG=str(Path(tempfile.gettempdir()) / "gov_test_audit.jsonl"))
@@ -1015,6 +1016,69 @@ def deliverable_checks():
         deliv.unlink(missing_ok=True)
 
 
+PDF_MD = """---
+dil: en
+kaynak_rapor: reports/2026-10-30_log_ornek.md
+musteri: Örnek Müşteri
+teslim_tarihi: 2026-10-30
+---
+
+# Log review for web01
+
+## Summary
+- **One** FACT item, see `sshd_config` line 12.
+
+## Findings
+
+| # | Severity | FACT | FIX |
+|---|---|---|---|
+| 1 | High | `PermitRootLogin yes` | `PermitRootLogin no` |
+
+## Evidence
+```
+grep -n PermitRootLogin sshd_config -> 12:PermitRootLogin yes
+```
+A **bold run around a `code` span** and a <script> tag.
+
+## Verification
+Checked. CHECK items depend on the version.
+"""
+
+
+def pdf_checks():
+    """Teslim → PDF biçimlendiricisi: (açıklama, sonuç).
+
+    Betik içerik üretmez, yalnızca biçimler; sınanan şey de bu: frontmatter
+    müşteriye gitmez, metin olduğu gibi kalır, kod bloğunun içine dokunulmaz.
+    HTML üretimi sınanır, Chrome gerektiren adım sınanmaz.
+    """
+    langs = govlib.load_json(P("deliverable_languages"))
+    html = to_pdf.build_html(PDF_MD, "Log review for web01")
+
+    # İzlenebilirlik alanları müşteriye giden dosyada görünmez (CLAUDE.md → Customer deliverable).
+    yield "frontmatter PDF'e geçmez", not any(
+        k in html for k in ("dil: en", "kaynak_rapor:", "musteri:", "teslim_tarihi:"))
+    yield "başlık h1 olur", "<h1>Log review for web01</h1>" in html
+    yield "bölüm başlıkları h2 olur", html.count("<h2>") == 4
+    yield "tablo çevrilir", "<table>" in html and html.count("<th>") == 4 and html.count("<td>") == 4
+    yield "madde listesi çevrilir", "<ul>" in html and "<li>" in html
+    yield "ham Markdown kalmaz", not re.search(r"(?m)^\s*\||\*\*|^#{1,4} ", html)
+    yield "çitli blok <pre> olur", html.count("<pre>") == 1
+    # Kod bloğunun içi veri; biçimlendirilmez, kaçışlanır.
+    yield "kod bloğunun içine dokunulmaz", "grep -n PermitRootLogin sshd_config -&gt; 12" in html
+    yield "HTML kaçışlanır", "&lt;script&gt;" in html and "<script>" not in html
+    # '**kalın**' çiftinin iki yanına kod parçası düşse de bozulmaz.
+    yield "kod parçasını kapsayan kalın yazı çevrilir", "<strong>bold run around a <code>code</code> span</strong>" in html
+    for key in ("fact_label", "action_label", "check_label"):
+        label = langs["languages"]["en"][key]
+        yield f"'{label}' etiketi nişan olur", f'class="badge' in html and f">{label}</span>" in html
+    # Nişan listesi dil tablosundan gelir; yeni dil eklemek betiği değiştirmez.
+    tr = langs["languages"]["tr"]["fact_label"]
+    yield f"Türkçe '{tr}' etiketi de tabloda", tr in dict(to_pdf.badge_labels())
+    yield "proje dışı yol mutlak basılır", to_pdf.show(ROOT / "a.pdf") == "a.pdf" and Path(
+        to_pdf.show(Path(tempfile.gettempdir()) / "a.pdf")).is_absolute()
+
+
 def main():
     sys.stdout.reconfigure(encoding="utf-8")
     failures = 0
@@ -1122,6 +1186,10 @@ def main():
 
     print("== Müşteri teslimi ==")
     for label, ok in deliverable_checks():
+        report(ok, label)
+
+    print("== PDF teslimi ==")
+    for label, ok in pdf_checks():
         report(ok, label)
 
     print("== Müşteri reposu ==")

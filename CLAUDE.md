@@ -98,6 +98,7 @@ The report is the internal verified record; the deliverable is the document the 
 - The deliverable adds nothing: no new finding, no new recommendation, no changed number, and no finding dropped — `[DOĞRULANMAMIŞ]` items are carried over as plainly worded limitations. An error found in the report goes back to its author as a `HELP REQUEST`; it is never fixed in the deliverable alone.
 - No internal label, section heading or verdict word (`[OLGU]`, `## Kapsam`, `KABUL`, …) may appear in a non-Turkish deliverable. The Validator matches these strings; untranslated prose is the writer's and the reviewer's responsibility.
 - `deliverables/` is customer data: `tools/new_customer.py` opens it empty in a customer repo and never copies this repo's deliverables into it.
+- The customer receives a PDF: `python3 tools/to_pdf.py deliverables/<file>.md` renders it next to the Markdown (Chrome/Edge headless; `--html` stops at HTML, `-o` picks another path). It only formats — the frontmatter machine fields are dropped, the prose is untouched, and label badges come from `deliverable_languages.json`. Run it after the reviewer's ONAY, never before.
 
 ## Machine-checked labels (keep in Turkish)
 Validator and tests match these strings exactly: `[OLGU]`, `[ÖNERİ]`, `[DOĞRULANMAMIŞ]`; report sections `## Kapsam`, `## Bulgular`, `## Kanıt`, `## Doğrulama Durumu`, `## Reviewer Kararı`; verdicts `KABUL | RED | BELİRSİZ`; review verdicts `ONAY | DÜZELTME GEREKLİ | RED`; persistence results `İZ VAR | İZ YOK | KANIT YOK`; quarantine statuses `KARANTINADA | DOGRULAMADAN_GECTI | REDDEDILDI | ONAYLANDI`.
@@ -107,6 +108,7 @@ The single source for all folder and file paths is `governance/paths.json`. Hook
 
 ## Commands
 - Hook tests: `python3 tests/test_governance.py` (`python` on Windows)
+- Deliverable PDF: `python3 tools/to_pdf.py deliverables/<file>.md` → PDF beside the Markdown
 - Audit panel: `python3 tools/build_site.py` → `site/index.html` (read-only, opens in a browser). CI publishes the panel to GitHub Pages on `main`.
 - Audit log integrity: `python3 tools/verify_audit.py [--base <git ref>]` (hash chain, append-only, an Approve record for every approved file; slices included)
 - Audit log publishing (user only): `python3 tools/publish_audit.py` → unpublished lines of the live log are written as a new slice under `governance/audit_archive/`. The script does not touch git; commit/push/PR is the user's.
