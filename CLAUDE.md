@@ -120,7 +120,7 @@ What is sold, what each package includes and what the customer must send before 
 - Hook tests: `python3 tests/test_governance.py` (`python` on Windows)
 - Customer intake: `python3 tools/intake.py [<service> <package>] [--siparis "<customer>"]` → catalogue / intake list / order folder
 - Deliverable PDF: `python3 tools/to_pdf.py deliverables/<file>.md` → PDF beside the Markdown
-- Audit panel: `python3 tools/build_site.py` → `site/index.html` (read-only, opens in a browser). CI publishes the panel to GitHub Pages on `main`.
+- Audit panel: `python3 tools/build_site.py` → `site/index.html` (read-only, opens in a browser). Lists the audit records plus the reports, knowledge records and customer deliverables (each deliverable with its source report's reviewer verdict and whether its PDF exists). CI publishes the panel to GitHub Pages on `main`.
 - Audit log integrity: `python3 tools/verify_audit.py [--base <git ref>]` (hash chain, append-only, an Approve record for every approved file; slices included)
 - Audit log publishing (user only): `python3 tools/publish_audit.py` → unpublished lines of the live log are written as a new slice under `governance/audit_archive/`. The script does not touch git; commit/push/PR is the user's.
 

@@ -269,6 +269,13 @@ footer p { margin: 0 0 4px; }
     <div class="table-wrap" id="knowledge"></div>
   </section>
 
+  <section class="card stack" aria-labelledby="dl-title">
+    <div class="card-head">
+      <div><h2 id="dl-title">Müşteri teslimleri</h2><p id="dl-note"></p></div>
+    </div>
+    <div class="table-wrap" id="deliverables"></div>
+  </section>
+
   <footer id="footer"></footer>
 </div>
 
@@ -666,6 +673,8 @@ const REVIEW = {
 };
 const ICONS = { good: '✓', warning: '!', critical: '✕', neutral: '–' };
 const PLACES = { quarantine: 'Karantina', approved: 'Onaylı' };
+// PDF, reviewer ONAY'ından sonra üretilir; eksikse teslim henüz müşteriye gidemez.
+const PDF_STATE = { var: ['Hazır', 'good'], yok: ['Yok', 'warning'] };
 
 function verdict(map, v, empty) {
   const [label, tone] = map[v] || [v || empty, 'neutral'];
@@ -715,6 +724,21 @@ function renderDocs() {
       el('td', { class: 'nowrap', text: k.accessed || '—' }),
       el('td', {}, verdict(REVIEW, k.review, 'Yazılmamış')))),
     'Henüz karantina veya onaylı bilgi kaydı yok.');
+  const dl = DATA.deliverables || [];
+  const withPdf = dl.filter(d => d.pdf).length;
+  $('#dl-note').textContent = dl.length
+    ? `${nf.format(dl.length)} teslim · ${nf.format(withPdf)} tanesinin PDF'i hazır. Teslim yalnızca reviewer ONAY'ı almış bir rapordan türetilir; kaynağın kararı burada yazılıdır.`
+    : '';
+  docTable($('#deliverables'), ['Teslim', 'Müşteri', 'Dil', 'Tarih', 'PDF', 'Kaynak rapor'],
+    dl.map(d => el('tr', {},
+      titleCell(d, d.errors.length ? `Validator: ${d.errors.length} hata — ${d.errors[0]}` : ''),
+      el('td', { text: d.customer || '—' }),
+      el('td', { class: 'nowrap', text: d.lang || '—' }),
+      el('td', { class: 'nowrap', text: d.date || '—' }),
+      el('td', {}, verdict(PDF_STATE, d.pdf ? 'var' : 'yok', 'Yok')),
+      el('td', { class: 'title' }, el('code', { text: d.source || '—' }),
+        verdict(REVIEW, d.source_review, 'Karar yok')))),
+    'Henüz müşteri teslimi yok.');
 }
 
 /* ---------- Kurulum ---------- */

@@ -300,6 +300,37 @@ def panel_checks():
         kn = data.get("knowledge", [])
         yield "karantina kaydı okunur, olmayan onaylı klasör hata vermez", \
             [(k["place"], k["status"], k["review"]) for k in kn] == [("quarantine", "KARANTINADA", "ONAY")]
+        # Müşteri teslimleri: kaynak raporun onayı ve PDF durumu panelde görünür.
+        dels = tmp / "teslimler"
+        dels.mkdir()
+        langs = govlib.load_json(P("deliverable_languages"))
+        (reps / Path(SOURCE_REL).name).write_text(APPROVED_REPORT, encoding="utf-8")
+        (dels / "t1.md").write_text(GOOD_DELIVERABLE_EN, encoding="utf-8")
+        # Kaynağı onaysız teslim ve kaynağı hiç olmayan teslim: ikisi de hata taşımalı.
+        (reps / "onaysiz.md").write_text(GOOD_REPORT, encoding="utf-8")
+        (dels / "t2.md").write_text(GOOD_DELIVERABLE_EN.replace(SOURCE_REL, "reports/onaysiz.md"), encoding="utf-8")
+        (dels / "t3.md").write_text(
+            GOOD_DELIVERABLE_EN.replace(SOURCE_REL, "reports/yok.md").replace(
+                "# ", "# </script><script>alert(3)</script> ", 1), encoding="utf-8")
+        build_site.build(audit, P("panel_template"), out, arch, reps, quar, appr, dels, langs)
+        html = out.read_text(encoding="utf-8")
+        m = re.search(r'<script type="application/json" id="panel-data">(.*?)</script>', html, re.S)
+        data = json.loads(m.group(1)) if m else {}
+        d1, d2, d3 = data.get("deliverables", [{}, {}, {}])
+        yield "teslimin müşterisi, dili ve tarihi okunur", (d1.get("customer"), d1.get("lang"), d1.get("date")) == (
+            "portföy örneği", "English", "2026-10-30")
+        yield "kaynak raporun reviewer kararı taşınır", (d1.get("source_review"), d1.get("errors")) == ("ONAY", [])
+        yield "PDF yoksa işaretlenmez", d1.get("pdf") is False
+        (dels / "t1.pdf").write_bytes(b"%PDF")
+        build_site.build(audit, P("panel_template"), out, arch, reps, quar, appr, dels, langs)
+        m = re.search(r'id="panel-data">(.*?)</script>', out.read_text(encoding="utf-8"), re.S)
+        yield "PDF varsa hazır görünür", json.loads(m.group(1))["deliverables"][0]["pdf"] is True
+        yield "onaysız kaynaktan teslim hata taşır", d2.get("source_review") == "" and bool(d2.get("errors"))
+        yield "kaynak rapor yoksa hata taşır", d3.get("source_review") == "" and bool(d3.get("errors"))
+        yield "teslim başlığındaki </script> sayfayı kıramaz", "<script>alert(3)" not in html
+        yield "teslim klasörü yoksa panel yine üretilir", build_site.build(
+            audit, P("panel_template"), out, arch, reps, quar, appr, tmp / "yok", langs) == (2, 2)
+
         bad_template = tmp / "sablon.html"
         bad_template.write_text("<html></html>", encoding="utf-8")
         yield "yer tutucusuz şablon reddedilir", raises(lambda: build_site.build(audit, bad_template, tmp / "x.html"), ValueError)

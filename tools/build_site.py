@@ -6,8 +6,9 @@ Kullanım:
 Yollar governance/paths.json'dan okunur: kaynak dirs.audit_archive dilimleri ve
 files.audit_log canlı kaydının yayınlanmamış satırları, şablon files.panel_template,
 çıktı files.site_index. CI'da canlı kayıt yoktur; panel yalnızca dilimlerden oluşur.
-Raporlar (dirs.reports) ve bilgi kayıtları (dirs.quarantine, dirs.approved) özet
-olarak eklenir: doğrulama durumu, reviewer kararı, etiket sayıları. Sayfa hiçbir dosyayı değiştirmez,
+Raporlar (dirs.reports), bilgi kayıtları (dirs.quarantine, dirs.approved) ve
+müşteri teslimleri (dirs.deliverables) özet olarak eklenir: doğrulama durumu,
+reviewer kararı, etiket sayıları, teslimin kaynak raporu ve PDF'i. Sayfa hiçbir dosyayı değiştirmez,
 ağ erişimi yapmaz ve dış kaynak yüklemez; veriyi yenilemek için betiği tekrar
 çalıştırın.
 """
@@ -75,6 +76,43 @@ def read_knowledge(quarantine_dir, approved_dir):
     return out
 
 
+def read_deliverables(deliverable_dir, report_dir, langs):
+    """Teslim özetleri: müşteri, dil, kaynak rapor ve onayı, PDF var mı, validator hataları.
+
+    Teslim türetilmiş bir belgedir; kaynak rapor ön bilgideki 'kaynak_rapor' alanında
+    yazılı. Panel onu rapor klasöründe adıyla arar: böylece paneli başka bir klasör
+    çiftiyle de üretebiliriz (testler, müşteri reposu).
+    """
+    def read_source(rel):
+        src = Path(report_dir) / Path(rel).name if report_dir else None
+        try:
+            return src.read_text(encoding="utf-8") if src else None
+        except OSError:
+            return None
+
+    out = []
+    for p in sorted(Path(deliverable_dir).glob("*.md")) if Path(deliverable_dir).is_dir() else []:
+        text = p.read_text(encoding="utf-8", errors="replace")
+        meta = validator.parse_frontmatter(text) or {}
+        source = meta.get("kaynak_rapor", "")
+        src_text = read_source(source) if source else None
+        lang = langs["languages"].get(meta.get("dil", ""), {})
+        out.append({
+            "path": govlib.rel("deliverables") + p.name,
+            "title": title_of(text, p.stem),
+            "customer": meta.get("musteri", ""),
+            "lang": lang.get("name", meta.get("dil", "")),
+            "date": meta.get("teslim_tarihi", ""),
+            "source": source,
+            "source_review": validator.find_verdict(
+                " ".join(validator.split_sections(src_text).get("Reviewer Kararı", [])),
+                validator.REVIEW_VERDICTS) if src_text else "",
+            "pdf": p.with_suffix(".pdf").is_file(),
+            "errors": validator.check_deliverable(text, read_source, langs),
+        })
+    return out
+
+
 def read_audit(path, archive_dir=None):
     """Kayıtları ve okunamayan satırları döndürür; bozuk satır sessizce atlanmaz, raporlanır.
 
@@ -106,11 +144,14 @@ def embed(data):
 
 
 def build(audit_path, template_path, out_path, archive_dir=None, report_dir=None, quarantine_dir=None,
-          approved_dir=None):
+          approved_dir=None, deliverable_dir=None, langs=None):
     records, errors = read_audit(audit_path, archive_dir)
     data = {
         "reports": read_reports(report_dir) if report_dir else [],
         "knowledge": read_knowledge(quarantine_dir, approved_dir) if quarantine_dir else [],
+        "deliverables": read_deliverables(
+            deliverable_dir, report_dir,
+            langs or govlib.load_json(govlib.path("deliverable_languages"))) if deliverable_dir else [],
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "root": str(govlib.ROOT),
         "source": f"{govlib.rel('audit_archive')} + {govlib.rel('audit_log')}",
@@ -132,7 +173,7 @@ def main():
     govlib.setup_io()
     count, bad = build(govlib.path("audit_log"), govlib.path("panel_template"), govlib.path("site_index"),
                        govlib.path("audit_archive"), govlib.path("reports"), govlib.path("quarantine"),
-                       govlib.path("approved"))
+                       govlib.path("approved"), govlib.path("deliverables"))
     note = f", {bad} satır okunamadı" if bad else ""
     print(f"Panel üretildi → {govlib.rel('site_index')} ({count} kayıt{note})")
     return 0
