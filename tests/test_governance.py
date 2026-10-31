@@ -170,6 +170,18 @@ durum: KARANTINADA
 ozet: OpenSSH sinyal işleyici yarış durumu.
 ---
 # CVE-2024-6387
+
+## Kaynakta yazanlar
+- Açıklama: NVD metni.
+
+## Yorum (çıkarım — kaynakta doğrudan yazmaz)
+- Yok
+
+## Çelişkiler ve belirsizlikler
+- Yok
+
+## Doğrulama notu
+- NVD ve satıcı danışmanlığı karşılaştırıldı.
 """
 
 IR_EVIDENCE = """### Kalıcılık
@@ -205,6 +217,19 @@ VALIDATOR_CASES = [
     ("agent ONAYLANDI veremez", validator.check_quarantine, GOOD_QUARANTINE.replace("KARANTINADA", "ONAYLANDI"), False),
     ("kaynaksız karantina", validator.check_quarantine, GOOD_QUARANTINE.replace("kaynak: https://nvd.nist.gov/vuln/detail/CVE-2024-6387\n", ""), False),
     ("frontmatter yok", validator.check_quarantine, "# başlık", False),
+    ("Yorum bölümü eksik karantina", validator.check_quarantine,
+     GOOD_QUARANTINE.replace("## Yorum (çıkarım — kaynakta doğrudan yazmaz)\n- Yok\n\n", ""), False),
+    ("Yorum başlığı parantezsiz de geçer", validator.check_quarantine,
+     GOOD_QUARANTINE.replace("## Yorum (çıkarım — kaynakta doğrudan yazmaz)", "## Yorum"), True),
+    ("maddesiz Yorum bölümü", validator.check_quarantine,
+     GOOD_QUARANTINE.replace("## Yorum (çıkarım — kaynakta doğrudan yazmaz)\n- Yok",
+                             "## Yorum (çıkarım — kaynakta doğrudan yazmaz)\nçıkarım yok"), False),
+    ("Kaynakta yazanlar bölümü eksik", validator.check_quarantine,
+     GOOD_QUARANTINE.replace("## Kaynakta yazanlar", "## Kaynak"), False),
+    ("Doğrulama notu bölümü eksik", validator.check_quarantine,
+     GOOD_QUARANTINE.replace("## Doğrulama notu", "## Notlar"), False),
+    ("Çelişkiler bölümü eksik", validator.check_quarantine,
+     GOOD_QUARANTINE.replace("## Çelişkiler ve belirsizlikler\n- Yok\n\n", ""), False),
 ]
 
 

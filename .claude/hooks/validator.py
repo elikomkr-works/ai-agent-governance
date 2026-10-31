@@ -25,6 +25,9 @@ VERDICTS = ("KABUL", "RED", "BELİRSİZ")
 # Reviewer kararı isteğe bağlıdır (eski kayıtlarda yok); varsa bu değerlerden biri olmalı.
 REVIEW_VERDICTS = ("DÜZELTME GEREKLİ", "ONAY", "RED", "BEKLİYOR")
 QUARANTINE_KEYS = ["kaynak", "erisim_tarihi", "durum", "ozet"]
+# Karantina kaydının zorunlu bölümleri (governance/templates/quarantine.md).
+# Başlık şablondaki parantezli açıklamayla uzatılabilir: '## Yorum (çıkarım — ...)' geçerlidir.
+QUARANTINE_SECTIONS = ["Kaynakta yazanlar", "Yorum", "Çelişkiler ve belirsizlikler", "Doğrulama notu"]
 # Müşteri teslimi (dirs.deliverables): iç rapordan türetilen, müşteri dilinde belge.
 # Makine alanları frontmatter'da durur ve Türkçedir; müşteriye gönderilen biçimde görünmez.
 DELIVERABLE_KEYS = ["dil", "kaynak_rapor", "musteri", "teslim_tarihi"]
@@ -121,6 +124,14 @@ def parse_frontmatter(text):
     return meta
 
 
+def match_section(sections, name):
+    """Bölüm başlığını adıyla veya 'ad (açıklama)' biçimiyle eşler; bulunan başlığı döndürür."""
+    for heading in sections:
+        if heading == name or heading.startswith(name + " "):
+            return heading
+    return None
+
+
 def check_quarantine(text):
     meta = parse_frontmatter(text)
     if meta is None:
@@ -135,6 +146,16 @@ def check_quarantine(text):
         errors.append(f"Geçersiz durum '{status}'. İzinli: {', '.join(sorted(AGENT_STATUSES))}.")
     if meta.get("reviewer") and not find_verdict(meta["reviewer"], REVIEW_VERDICTS):
         errors.append(f"reviewer alanı {', '.join(REVIEW_VERDICTS)} değerlerinden birini içermeli.")
+
+    sections = split_sections(text)
+    for name in QUARANTINE_SECTIONS:
+        found = match_section(sections, name)
+        if found is None:
+            errors.append(f"'## {name}' bölümü eksik; karantina şablonundaki dört bölüm zorunludur.")
+        elif not any(ITEM.match(line) for line in sections[found]):
+            errors.append(
+                f"'## {name}' bölümünde en az bir madde olmalı (çıkarım yoksa '- Yok' yazın)."
+            )
     return errors
 
 
