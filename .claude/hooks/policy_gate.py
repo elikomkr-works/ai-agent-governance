@@ -51,7 +51,7 @@ class Verdict:
 
 def tool_name(token):
     name = re.split(r"[\\/]", token.strip("'\""))[-1].lower()
-    return re.sub(r"\.(exe|py|ps1)$", "", name)
+    return re.sub(r"\.(exe|py|ps1|sh|bat|cmd)$", "", name)
 
 
 def tokenize(segment):

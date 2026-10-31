@@ -7,7 +7,9 @@
   },
   "active_scanners": [
     "nmap", "masscan", "zmap", "nikto", "nuclei", "nc", "ncat", "netcat",
-    "test-netconnection", "tnc", "hping3", "gobuster", "ffuf", "dirb"
+    "test-netconnection", "tnc", "hping3", "gobuster", "ffuf", "dirb",
+    "nessus", "openvas", "openvas-cli", "gvm", "gvm-cli", "qualys",
+    "zap", "zap-cli", "wpscan", "sslyze", "testssl"
   ],
   "diagnostic_tools": ["ping", "tracert", "traceroute", "pathping", "mtr"],
   "http_clients": ["curl", "wget", "invoke-webrequest", "iwr", "invoke-restmethod", "irm"],
