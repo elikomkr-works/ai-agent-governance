@@ -30,6 +30,7 @@ import new_customer  # noqa: E402
 import to_pdf  # noqa: E402
 import activate_proposal  # noqa: E402
 import intake  # noqa: E402
+import approve  # noqa: E402
 
 ENV = dict(os.environ, GOV_AUDIT_LOG=str(Path(tempfile.gettempdir()) / "gov_test_audit.jsonl"))
 # Hook vakaları yerel davranışı sınar; bulut kuralları cloud_checks() içinde ayrıca sınanır.
@@ -1136,6 +1137,50 @@ def pdf_checks():
         to_pdf.show(Path(tempfile.gettempdir()) / "a.pdf")).is_absolute()
 
 
+def approval_checks():
+    """Onay karnesi ve engeli: (açıklama, sonuç).
+
+    Onay tek insan adımıdır. Bu yüzden soru sorulmadan önce kaydın kendi beyanı
+    (reviewer kararı, kaynak sayısı, doğrulanmamış maddelerin tam listesi) basılır
+    ve reviewer ONAY vermemişse onay engellenir. Engel yalnızca gerekçeli --yine-de
+    ile aşılır; testler karnenin madde atlamadığını ve engelin kapanmadığını sınar.
+    """
+    onayli = (
+        "---\ndurum: DOGRULAMADAN_GECTI\n"
+        "reviewer: ONAY — tur 2 · 12 iddia 3 kaynakla karşılaştırıldı\n"
+        "kaynak: https://a.example/1\nek_kaynaklar: https://b.example/2, https://c.example/3\n"
+        "erisim_tarihi: 2026-10-31\n---\n\n"
+        "## Kaynakta yazanlar\n- Bir olgu. — https://a.example/1\n"
+        "- [DOĞRULANMAMIŞ] Birinci açık madde.\n"
+        "  - [DOĞRULANMAMIŞ] İkinci açık madde.\n"
+    )
+    satirlar = approve.karne(onayli)
+    metin = "\n".join(satirlar)
+
+    yield "karne reviewer kararını gösterir", "ONAY — tur 2" in metin
+    yield "karne kaynak sayısını sayar", "3 ayrı URL" in metin
+    yield "karne erişim tarihini gösterir", "2026-10-31" in metin
+    yield "karne etiketli satırları sayar", "Doğrulanmamış  : 2 etiketli satır" in metin
+    yield "karne etiketli satırları tek tek yazar", \
+        "Birinci açık madde" in metin and "İkinci açık madde" in metin
+    # Ön bilgideki reviewer alanı da etiket taşıyabilir; sayım yalnızca gövdeyi saymalı.
+    ontaki = onayli.replace("12 iddia", "12 iddia [DOĞRULANMAMIŞ] yok")
+    yield "ön bilgideki etiket sayılmaz", \
+        "Doğrulanmamış  : 2 etiketli satır" in "\n".join(approve.karne(ontaki))
+
+    yield "ONAY + DOGRULAMADAN_GECTI engellenmez", approve.engel(onayli) == []
+    duzeltme = onayli.replace("reviewer: ONAY — tur 2", "reviewer: DÜZELTME GEREKLİ — tur 2")
+    yield "DÜZELTME GEREKLİ onayı engeller", bool(approve.engel(duzeltme))
+    karantina = onayli.replace("durum: DOGRULAMADAN_GECTI", "durum: KARANTINADA")
+    yield "doğrulanmamış durum onayı engeller", bool(approve.engel(karantina))
+    yield "reviewer alanı yoksa engellenir", bool(approve.engel(onayli.replace("reviewer:", "x:")))
+    yield "iki engel birlikte bildirilir", len(approve.engel(
+        karantina.replace("reviewer: ONAY — tur 2", "reviewer: RED — tur 2"))) == 2
+    # ONAYLANDI bir kez verildikten sonra kayıt yeniden onaylanamaz: durum artık DOGRULAMADAN_GECTI değil.
+    yield "onaylanmış kayıt yeniden onaylanamaz", \
+        bool(approve.engel(onayli.replace("durum: DOGRULAMADAN_GECTI", "durum: ONAYLANDI")))
+
+
 def intake_checks():
     """Hizmet kataloğu ve alım listesi: (açıklama, sonuç).
 
@@ -1346,6 +1391,10 @@ def main():
 
     print("== Müşteri reposu ==")
     for label, ok in customer_checks():
+        report(ok, label)
+
+    print("== Bilgi onayı ==")
+    for label, ok in approval_checks():
         report(ok, label)
 
     print(f"\nSonuç: {failures} başarısız" if failures else "\nSonuç: tüm testler geçti")
