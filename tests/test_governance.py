@@ -197,6 +197,20 @@ IR_EVIDENCE = """### Kalıcılık
 - x.sh.kanit `""" + "a" * 64 + "`\n"
 GOOD_IR = GOOD_REPORT.replace("- `samples/auth.log:2`\n", IR_EVIDENCE)
 
+PHISH_EVIDENCE = """### P1-P6 kontrol listesi
+| # | Kontrol | Nerede | Gerekçe | Sonuç |
+|---|---|---|---|---|
+| P1 | Received zinciri | satır 9 | `from localhost (unknown [198.51.100.7])` | İZ VAR |
+| P2 | SPF (kayıtlı) | satır 13 | `spf=fail` | İZ VAR |
+| P3 | DKIM (kayıtlı) | satır 14 | `dkim=none` | İZ VAR |
+| P4 | DMARC (kayıtlı) | satır 15 | `dmarc=fail` | İZ VAR |
+| P5 | From / Reply-To | satır 1 | `Reply-To` alan adı `From`dan farklı | İZ VAR |
+| P6 | URL ve ek envanteri | satır 40 | `href` bağlantı metninden farklı | İZ VAR |
+
+Toplam: İZ VAR 6 + İZ YOK 0 + KANIT YOK 0 = 6.
+"""
+GOOD_PHISH = GOOD_REPORT.replace("- `samples/auth.log:2`\n", PHISH_EVIDENCE)
+
 VALIDATOR_CASES = [
     ("geçerli olay müdahale raporu", validator.check_ir_report, GOOD_IR, True),
     ("kalıcılık maddesi eksik", validator.check_ir_report, GOOD_IR.replace("| K6 | İZ YOK | suid_sgid.txt |\n", ""), False),
@@ -205,6 +219,20 @@ VALIDATOR_CASES = [
     ("KANIT YOK varken KABUL verilemez", validator.check_ir_report, GOOD_IR.replace("| K6 | İZ YOK", "| K6 | KANIT YOK"), False),
     ("KANIT YOK varken BELİRSİZ geçer", validator.check_ir_report,
      GOOD_IR.replace("| K6 | İZ YOK", "| K6 | KANIT YOK").replace("KABUL", "BELİRSİZ"), True),
+    ("geçerli oltalama raporu", validator.check_phish_report, GOOD_PHISH, True),
+    ("oltalama maddesi eksik", validator.check_phish_report,
+     GOOD_PHISH.replace("| P3 | DKIM (kayıtlı) | satır 14 | `dkim=none` | İZ VAR |\n", ""), False),
+    ("oltalama sonucu yazılmamış", validator.check_phish_report,
+     GOOD_PHISH.replace("`spf=fail` | İZ VAR |", "`spf=fail` | bakıldı |"), False),
+    ("gerekçeye yazılan ikinci sonuç toplamı bozar", validator.check_phish_report,
+     GOOD_PHISH.replace("`dkim=none` | İZ VAR |", "`dkim=none`, İZ YOK sayılmaz | İZ VAR |"), False),
+    ("oltalamada KANIT YOK varken KABUL verilemez", validator.check_phish_report,
+     GOOD_PHISH.replace("| P1 | Received zinciri | satır 9 | `from localhost (unknown [198.51.100.7])` | İZ VAR |",
+                        "| P1 | Received zinciri | yok | ihracat kesilmiş | KANIT YOK |"), False),
+    ("oltalamada KANIT YOK varken BELİRSİZ geçer", validator.check_phish_report,
+     GOOD_PHISH.replace("| P1 | Received zinciri | satır 9 | `from localhost (unknown [198.51.100.7])` | İZ VAR |",
+                        "| P1 | Received zinciri | yok | ihracat kesilmiş | KANIT YOK |").replace("KABUL", "BELİRSİZ"), True),
+    ("oltalama raporunda hash aranmaz", validator.check_phish_report, GOOD_PHISH, True),
     ("geçerli rapor", validator.check_report, GOOD_REPORT, True),
     ("bölüm eksik", validator.check_report, GOOD_REPORT.replace("## Kanıt", "## Notlar"), False),
     ("etiketsiz bulgu", validator.check_report, GOOD_REPORT.replace("- [ÖNERİ] ", "- "), False),
@@ -1338,6 +1366,21 @@ def main():
         report(bool(out) and out.get("decision") == "block", "'_ir_' raporunda kalıcılık tablosu zorunlu")
         tmp.write_text(GOOD_IR, encoding="utf-8")
         report(run_hook("validator.py", payload) is None, "tam olay müdahale raporu geçer")
+    finally:
+        tmp.unlink(missing_ok=True)
+
+    # Oltalama kontrolü dosya adındaki '_phish_' ile devreye girer; kalıcılık tablosu burada aranmaz.
+    tmp = P("reports") / "_test_phish_gecici.md"
+    try:
+        tmp.write_text(GOOD_REPORT, encoding="utf-8")
+        payload = {"hook_event_name": "PostToolUse", "tool_name": "Write", "tool_input": {"file_path": str(tmp)}}
+        out = run_hook("validator.py", payload)
+        report(bool(out) and out.get("decision") == "block", "'_phish_' raporunda P1-P6 tablosu zorunlu")
+        tmp.write_text(GOOD_PHISH, encoding="utf-8")
+        report(run_hook("validator.py", payload) is None, "tam oltalama raporu geçer")
+        tmp.write_text(GOOD_IR, encoding="utf-8")
+        out = run_hook("validator.py", payload)
+        report(bool(out) and out.get("decision") == "block", "oltalama raporunda K1-K6 tablosu kabul edilmez")
     finally:
         tmp.unlink(missing_ok=True)
 

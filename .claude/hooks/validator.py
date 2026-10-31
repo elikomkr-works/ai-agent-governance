@@ -35,7 +35,10 @@ DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 ITEM = re.compile(r"^\s*([-*]|\d+\.|\|)")
 # Olay müdahale raporları (incident-response skill'i) için ek yapı kontrolü.
 IR_REPORT = re.compile(r"_ir_[^/]*\.md$")
+# Oltalama triyaj raporları (phishing-triage skill'i) için ek yapı kontrolü.
+PHISH_REPORT = re.compile(r"_phish_[^/]*\.md$")
 PERSISTENCE_ITEMS = [f"K{i}" for i in range(1, 7)]
+PHISH_ITEMS = [f"P{i}" for i in range(1, 7)]
 PERSISTENCE_RESULTS = ("İZ VAR", "İZ YOK", "KANIT YOK")
 SHA256 = re.compile(r"\b[0-9a-fA-F]{64}\b")
 AGENT_STATUSES = {"ADAY", "KARANTINADA", "DOGRULAMADAN_GECTI", "REDDEDILDI", "YENIDEN_INCELENIYOR"}
@@ -86,24 +89,49 @@ def check_report(text):
     return errors
 
 
-def check_ir_report(text):
-    """Olay müdahale raporu (adında '_ir_'): kalıcılık tablosu K1–K6 ve bütünlük için en az bir SHA-256."""
-    sections = split_sections(text)
-    evidence = sections.get("Kanıt", [])
-    rows = {m.group(1): line for line in evidence if (m := re.match(r"^\|\s*(K[1-6])\s*\|", line))}
+def checklist_errors(sections, items, table):
+    """Kanıt bölümündeki zorunlu kontrol listesi: her madde bir satır, her satır tam bir sonuç.
+
+    Ortak kontrol: olay müdahalesi K1–K6, oltalama triyajı P1–P6. Satır başına tek sonuç
+    kuralı, gerekçe metnine sonuç değeri yazıp toplamı bozan satırları da yakalar.
+    """
+    rows = {m.group(1): line for line in sections.get("Kanıt", [])
+            if (m := re.match(r"^\|\s*(%s)\s*\|" % "|".join(items), line))}
     errors = []
-    missing = [k for k in PERSISTENCE_ITEMS if k not in rows]
+    missing = [k for k in items if k not in rows]
     if missing:
-        errors.append(f"Kalıcılık tablosunda eksik madde: {', '.join(missing)} (Kanıt bölümünde '| K1 | …' satırları).")
+        errors.append(f"{table} eksik madde: {', '.join(missing)} "
+                      f"(Kanıt bölümünde '| {items[0]} | …' satırları).")
     for key, line in sorted(rows.items()):
-        if not any(r in line for r in PERSISTENCE_RESULTS):
+        found = sum(line.count(r) for r in PERSISTENCE_RESULTS)
+        if not found:
             errors.append(f"{key} satırında sonuç yok: {', '.join(PERSISTENCE_RESULTS)} değerlerinden biri yazılmalı.")
-    if not SHA256.search("\n".join(evidence)):
-        errors.append("Kanıt bölümünde en az bir SHA-256 değeri olmalı (kanıt bütünlüğü).")
+        elif found > 1:
+            errors.append(f"{key} satırında birden fazla sonuç değeri var; tam olarak biri yazılmalı "
+                          f"(toplam {len(items)} madde çıkmalı).")
     status = " ".join(sections.get("Doğrulama Durumu", []))
     if find_verdict(status, VERDICTS) == "KABUL" and any("KANIT YOK" in line for line in rows.values()):
         errors.append("KANIT YOK olan madde varken Doğrulama Durumu KABUL olamaz (en fazla BELİRSİZ).")
     return errors
+
+
+def check_ir_report(text):
+    """Olay müdahale raporu (adında '_ir_'): kalıcılık tablosu K1–K6 ve bütünlük için en az bir SHA-256."""
+    sections = split_sections(text)
+    errors = checklist_errors(sections, PERSISTENCE_ITEMS, "Kalıcılık tablosunda")
+    if not SHA256.search("\n".join(sections.get("Kanıt", []))):
+        errors.append("Kanıt bölümünde en az bir SHA-256 değeri olmalı (kanıt bütünlüğü).")
+    return errors
+
+
+def check_phish_report(text):
+    """Oltalama triyaj raporu (adında '_phish_'): P1–P6 kontrol listesi, toplam 6 madde.
+
+    Defang Validator'ın işi değildir: '## Kanıt' ve '## Kapsam' URL/alan adlarını backtick
+    içinde verbatim tutar (reviewer sözleşmesi), defang yalnızca '## Bulgular' kuralıdır.
+    Hash ve itibar sorgusu bu skill'in kapsamı dışında olduğu için SHA-256 aranmaz.
+    """
+    return checklist_errors(split_sections(text), PHISH_ITEMS, "Oltalama kontrol listesinde")
 
 
 def find_verdict(text, choices):
@@ -265,8 +293,11 @@ def check_file(path, govlib):
     except OSError as e:
         return rel, [f"Dosya okunamadı, doğrulanmış sayılmaz: {e}"]
     errors = check(text)
-    if check is check_report and not errors and IR_REPORT.search(rel):
-        errors = check_ir_report(text)
+    if check is check_report and not errors:
+        if IR_REPORT.search(rel):
+            errors = check_ir_report(text)
+        elif PHISH_REPORT.search(rel):
+            errors = check_phish_report(text)
     return rel, errors
 
 
