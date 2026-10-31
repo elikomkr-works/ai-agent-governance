@@ -1,0 +1,100 @@
+Plugin ID,CVE,CVSS v3.0 Base Score,Risk,Host,Protocol,Port,Name,Synopsis,Solution,Plugin Output,See Also
+19506,,,None,192.0.2.21,tcp,0,Nessus Scan Information,Information about this scan.,n/a,"Scan type : Normal
+Scan policy used : Basic Network Scan
+Scanner IP : 192.0.2.9
+Port scanner(s) : nessus_syn_scanner
+Credentialed checks : no
+Scan Start Date : 2026/10/20 02:14 UTC
+Scan duration : 1812 sec",
+19506,,,None,192.0.2.22,tcp,0,Nessus Scan Information,Information about this scan.,n/a,"Scan type : Normal
+Credentialed checks : no
+Scan Start Date : 2026/10/20 02:14 UTC",
+19506,,,None,10.10.4.15,tcp,0,Nessus Scan Information,Information about this scan.,n/a,"Scan type : Normal
+Credentialed checks : yes
+Credentialed checks : yes, as 'svc_scan' via SSH
+Scan Start Date : 2026/10/20 02:14 UTC",
+152514,CVE-2021-44228,10.0,Critical,192.0.2.21,tcp,8080,Apache Log4j 2.x < 2.15.0 Remote Code Execution,The remote host runs a version of Apache Log4j that is affected by a remote code execution vulnerability.,Upgrade to Apache Log4j version 2.17.1 or later.,"Based on the HTTP banner of the remote service the following was observed :
+
+  URL               : http://192.0.2.21:8080/
+  Installed version : 2.14.1
+  Fixed version     : 2.15.0
+
+Note: this plugin determined the version from a banner and did not
+authenticate to the host.",https://logging.apache.org/log4j/2.x/security.html
+156327,CVE-2021-44228,10.0,Critical,192.0.2.21,tcp,8443,Apache Log4j Remote Code Execution (direct check),The remote web application appears to use a vulnerable Log4j version.,Upgrade to Apache Log4j version 2.17.1 or later.,"The remote service did not respond to the callback probe within the
+timeout. The finding is based on the version string only.",https://logging.apache.org/log4j/2.x/security.html
+138098,CVE-2021-41773,7.5,High,192.0.2.21,tcp,80,Apache HTTP Server 2.4.49 Path Traversal,The remote web server is affected by a path traversal vulnerability.,Upgrade to Apache HTTP Server 2.4.51 or later.,"Banner : Apache/2.4.49 (Debian)
+
+The scanner did not attempt exploitation. The version was taken from
+the Server response header, which the administrator can change.",https://httpd.apache.org/security/vulnerabilities_24.html
+138098,CVE-2021-41773,7.5,High,192.0.2.22,tcp,80,Apache HTTP Server 2.4.49 Path Traversal,The remote web server is affected by a path traversal vulnerability.,Upgrade to Apache HTTP Server 2.4.51 or later.,"Banner : Apache/2.4.49 (Debian)",https://httpd.apache.org/security/vulnerabilities_24.html
+42873,,4.3,Medium,192.0.2.21,tcp,443,SSL Medium Strength Cipher Suites Supported (SWEET32),The remote service supports the use of medium strength cipher suites.,Reconfigure the affected application to avoid use of medium strength ciphers.,"The following medium strength cipher suites are supported :
+
+  TLS_RSA_WITH_3DES_EDE_CBC_SHA",
+157288,CVE-2022-22965,9.8,Critical,10.10.4.15,tcp,8080,Spring Framework Remote Code Execution (Spring4Shell),The remote host is affected by a remote code execution vulnerability.,Upgrade to Spring Framework 5.3.18 / 5.2.20 or later.,"Installed version : 5.3.16
+Fixed version     : 5.3.18
+
+Detected from the JAR file spring-core-5.3.16.jar found at
+/opt/app/lib/ during an authenticated local check.
+
+Note: exploitation requires a JDK 9+ deployment packaged as a WAR on
+Apache Tomcat; the scanner did not verify the deployment layout.",https://tanzu.vmware.com/security/cve-2022-22965
+104743,,,None,192.0.2.21,tcp,443,TLS Version 1.0 Protocol Detection,The remote service encrypts traffic using an older version of TLS.,Enable support for TLS 1.2 and 1.3 and disable TLS 1.0.,"TLSv1 is enabled and the server supports at least one cipher.",
+51192,,6.5,Medium,192.0.2.21,tcp,443,SSL Certificate Cannot Be Trusted,The SSL certificate for this service cannot be trusted.,Purchase or generate a proper certificate for this service.,"The following certificate was at the top of the certificate chain
+sent by the remote host, but it is signed by an unknown certificate
+authority :
+
+  |-Subject : CN=intranet.musteri.example",
+10863,,,None,192.0.2.21,tcp,443,SSL Certificate Information,This plugin displays the SSL certificate.,n/a,"Subject Name: CN=intranet.musteri.example
+Not After: Nov 30 23:59:59 2026 GMT",
+11219,,,None,192.0.2.22,tcp,22,Nessus SYN scanner,It is possible to determine which TCP ports are open.,n/a,"Port 22/tcp was found to be open",
+153953,CVE-2023-38545,9.8,Critical,10.10.4.15,tcp,0,curl SOCKS5 Heap Buffer Overflow,The version of curl installed on the remote host is affected by a heap buffer overflow.,Upgrade to curl 8.4.0 or later.,"Path              : /usr/bin/curl
+Installed version : 7.88.1-10+deb12u4
+Fixed version     : 7.88.1-10+deb12u5
+
+The distribution backported the fix; the installed package version is
+above the distribution's fixed version.",https://curl.se/docs/CVE-2023-38545.html
+198432,CVE-2024-6387,8.1,High,192.0.2.22,tcp,22,OpenSSH < 9.8p1 Signal Handler Race Condition (regreSSHion),The remote SSH server is affected by a race condition.,Upgrade to OpenSSH 9.8p1 or later.,"Banner : SSH-2.0-OpenSSH_9.2p1 Debian-2+deb12u3
+
+The scanner reported this finding from the banner version. Debian
+backports security fixes without changing the upstream version in the
+banner, so this result requires an authenticated package check to
+confirm.",https://www.openssh.com/txt/release-9.8
+198432,CVE-2024-6387,8.1,High,10.10.4.15,tcp,22,OpenSSH < 9.8p1 Signal Handler Race Condition (regreSSHion),The remote SSH server is affected by a race condition.,Upgrade to OpenSSH 9.8p1 or later.,"Banner : SSH-2.0-OpenSSH_9.2p1 Debian-2+deb12u3",https://www.openssh.com/txt/release-9.8
+90317,,6.5,Medium,192.0.2.22,tcp,22,SSH Weak Algorithms Supported,The remote SSH server is configured to allow weak key exchange algorithms.,Disable the weak algorithms.,"The following weak key exchange algorithms are supported :
+
+  diffie-hellman-group1-sha1",
+26928,,,None,192.0.2.21,tcp,443,SSL Weak Cipher Suites Supported,The remote service supports the use of weak SSL ciphers.,Reconfigure the affected application.,"Low Strength Ciphers (<= 64-bit key)
+
+  TLS_RSA_WITH_DES_CBC_SHA",
+58987,,,None,192.0.2.21,tcp,80,PHP Unsupported Version Detection,The remote host runs an unsupported version of PHP.,Upgrade to a version of PHP that is currently supported.,"  Source            : X-Powered-By: PHP/7.4.33
+  Installed version : 7.4.33
+  End of support    : 2022/11/28",https://www.php.net/supported-versions.php
+147164,CVE-2022-31625,8.1,High,192.0.2.21,tcp,80,PHP 7.4.x < 7.4.30 Multiple Vulnerabilities,The version of PHP running on the remote web server is affected by multiple vulnerabilities.,Upgrade to PHP version 7.4.30 or later.,"  Source            : X-Powered-By: PHP/7.4.33
+  Installed version : 7.4.33
+  Fixed version     : 7.4.30",
+10107,,,None,192.0.2.21,tcp,80,HTTP Server Type and Version,A web server is running on the remote host.,n/a,"The remote web server type is :
+
+Apache/2.4.49 (Debian)",
+24260,,,None,192.0.2.22,tcp,80,HTTP Information,Some information about the remote HTTP configuration can be extracted.,n/a,"Response Code : HTTP/1.1 200 OK",
+45590,,,None,10.10.4.15,tcp,0,Common Platform Enumeration (CPE),It was possible to enumerate CPE names.,n/a,"cpe:/o:debian:debian_linux:12
+cpe:/a:apache:tomcat:9.0.71",
+170296,CVE-2023-28709,7.5,High,10.10.4.15,tcp,8080,Apache Tomcat 9.0.x < 9.0.74 Denial of Service,The remote Tomcat server is affected by a denial of service vulnerability.,Upgrade to Apache Tomcat version 9.0.74 or later.,"Installed version : 9.0.71
+Fixed version     : 9.0.74
+
+Detected from the authenticated file check of
+/opt/tomcat/lib/catalina.jar.",https://lists.apache.org/thread/5h4qp1r4rbm6yxbkcyk2nk5qgdtwjrbw
+35291,,6.5,Medium,192.0.2.21,tcp,443,SSL Certificate Signed Using Weak Hashing Algorithm,The SSL certificate has been signed using a weak hashing algorithm.,Contact the Certificate Authority to have the certificate reissued.,"The following certificate was signed using SHA-1 :
+
+  |-Subject : CN=intranet.musteri.example",
+12085,,,None,192.0.2.22,tcp,80,Apache Server Status Page Information Disclosure,The remote web server discloses its status page.,Restrict access to /server-status.,"The following information was gathered from /server-status :
+
+  Server Version: Apache/2.4.49 (Debian)",
+10881,,,None,192.0.2.22,tcp,22,SSH Protocol Versions Supported,A SSH server is running on the remote host.,n/a,"The remote SSH daemon supports the following versions :
+
+  2.0",
+70658,,2.6,Low,192.0.2.22,tcp,22,SSH Server CBC Mode Ciphers Enabled,The SSH server is configured to support Cipher Block Chaining encryption.,Disable CBC mode cipher encryption.,"The following client-to-server CBC ciphers are supported :
+
+  aes128-cbc",
+33850,,,None,10.10.4.15,tcp,0,Unix Operating System Unsupported Version Detection,The remote operating system is supported.,n/a,"Installed OS : Debian 12
+Support end date : 2028/06/10",
