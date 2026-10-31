@@ -26,9 +26,11 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / ".claude" / "hooks"))
 import govlib  # noqa: E402
 
-LIMIT_LABEL = {"config_files": "config dosyası", "log_files": "log dosyası", "hosts": "host"}
+LIMIT_LABEL = {"config_files": "config dosyası", "log_files": "log dosyası",
+               "hosts": "host", "emails": "e-posta"}
 # Müşteriye giden mesajda sınırlar İngilizce ve tekil/çoğul doğru yazılır.
-LIMIT_EN = {"config_files": "config file", "log_files": "log file", "hosts": "host"}
+LIMIT_EN = {"config_files": "config file", "log_files": "log file",
+            "hosts": "host", "emails": "email"}
 
 
 def load():

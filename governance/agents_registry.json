@@ -15,6 +15,7 @@
     {"name": "reviewer", "role": "Independent Auditor — content accuracy, recount", "skills": [], "writes": [], "tools": ["Read", "Grep", "Glob", "Bash", "WebFetch"], "shell": "broad"},
     {"name": "skill-smith", "role": "Skill Smith — new skill/agent drafts", "skills": [], "writes": ["@proposals"], "tools": ["Read", "Glob", "Grep", "Write"]},
     {"name": "Explore", "role": "Built-in read-only search agent", "skills": [], "writes": [], "tools": [], "builtin": true},
-    {"name": "Plan", "role": "Built-in planning agent", "skills": [], "writes": [], "tools": [], "builtin": true}
+    {"name": "Plan", "role": "Built-in planning agent", "skills": [], "writes": [], "tools": [], "builtin": true},
+    {"name": "phishing-analyst", "role": "Phishing Triage Analyst — static review of a customer-exported suspicious email, read-only, no shell and no network tool", "skills": ["phishing-triage"], "writes": ["@reports", "@work"], "tools": ["Read", "Grep", "Glob", "Write", "Skill"]}
   ]
 }

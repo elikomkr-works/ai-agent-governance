@@ -18,6 +18,81 @@
   },
 
   "services": {
+    "phishing-triage": {
+      "name": "Suspicious email (phishing) triage from the exported message",
+      "skill": "phishing-triage",
+      "agent": "phishing-analyst",
+      "report_slug": "phish",
+      "input_kind": "exported email files (.eml, or a plain-text export of the full headers and body)",
+      "packages": {
+        "basic": {
+          "title": "Single Email Check",
+          "price_usd": 15,
+          "delivery_days": 1,
+          "revisions": 1,
+          "limits": {"emails": 1, "config_files": 0, "log_files": 0, "hosts": 0},
+          "includes": [
+            "1 exported email reviewed statically, read-only",
+            "six-item header checklist: Received chain, SPF, DKIM, DMARC, sender-field split, URL and attachment inventory",
+            "every finding quotes the exact header or body line",
+            "URLs listed defanged and never visited; attachments never opened or decoded",
+            "independent reviewer check before delivery"
+          ],
+          "excludes": ["look-alike domain comparison", "user-facing warning text", "campaign correlation", "executive summary"]
+        },
+        "standard": {
+          "title": "Verdict + Response Pack",
+          "price_usd": 40,
+          "delivery_days": 2,
+          "revisions": 1,
+          "limits": {"emails": 3, "config_files": 0, "log_files": 0, "hosts": 0},
+          "includes": [
+            "up to 3 exported emails, each with the full six-item checklist",
+            "look-alike domain comparison against the domains you tell me are legitimate",
+            "IOC list (sender addresses, domains, URLs, attachment names) for your mail gateway block list",
+            "short plain-language warning text you can forward to staff",
+            "independent reviewer check before delivery"
+          ],
+          "excludes": ["campaign correlation", "executive summary"]
+        },
+        "premium": {
+          "title": "Campaign Triage",
+          "price_usd": 110,
+          "delivery_days": 3,
+          "revisions": 2,
+          "limits": {"emails": 10, "config_files": 0, "log_files": 0, "hosts": 0},
+          "includes": [
+            "up to 10 exported emails, each with the full six-item checklist",
+            "campaign correlation: shared infrastructure, reused sender patterns and a message timeline",
+            "IOC list and staff warning text",
+            "executive summary for non-technical readers",
+            "independent reviewer check before delivery"
+          ],
+          "excludes": []
+        }
+      },
+      "intake": [
+        {"id": "email_files", "blocker": true,
+         "ask_en": "The suspicious email(s) as .eml files, or a plain-text export of the FULL headers plus the body. A screenshot or a forwarded copy does not work: forwarding strips the original headers, and the whole check is built on them. Please use a neutral file name (not 'credentials.eml' or 'password.eml').",
+         "note_tr": "Ekran görüntüsü ya da iletilmiş kopya reddedilir: SPF/DKIM/DMARC ve Received zinciri orijinal başlıklarda durur, iletmede kaybolur. Dosya adı uyarısı kasıtlı: 'credentials', 'secrets' gibi adlar policy.json → sensitive_patterns'e takılır ve bulut oturumunda işi durdurur."},
+        {"id": "legit_domains", "blocker": true,
+         "ask_en": "Your own domain(s), and the domain the message claims to come from (e.g. your supplier's real website). Needed to judge look-alike domains.",
+         "note_tr": "Benzer-alan-adı kararı müşterinin gerçek alan adı bilinmeden verilemez; bilinmezse bulgu [DOĞRULANMAMIŞ] olur."},
+        {"id": "clicked", "blocker": true,
+         "ask_en": "Did anyone click the link, open the attachment, enter credentials or make a payment? A plain yes/no/don't know is enough.",
+         "note_tr": "Evet ise kapsam değişir: bu hizmet e-posta ile sınırlıdır, tıklama sonrası host incelemesi incident-response işidir ve ayrı teklif edilir. Yanıt gelmeden iş başlamaz."},
+        {"id": "mail_platform", "blocker": false,
+         "ask_en": "Your mail platform (Microsoft 365, Google Workspace, on-premise Exchange, other).",
+         "note_tr": "Engelleme ve kural önerisi platforma göre yazılır; yoksa öneri genel kalır ve bu varsayım raporda yazılır."},
+        {"id": "known_senders", "blocker": false,
+         "ask_en": "Partners or services that legitimately send you invoices, so their domains are not flagged.",
+         "note_tr": "Gelmezse meşru gönderenler de IOC listesine girebilir; teslimde bu sınır belirtilir."},
+        {"id": "other_recipients", "blocker": false, "packages": ["standard", "premium"],
+         "ask_en": "How many people in your organisation received it, and whether the copies differ (different recipient names, amounts or links).",
+         "note_tr": "Kampanya korelasyonu için; tek kopya varsa korelasyon bölümü 'tek örnek' notuyla kapatılır."}
+      ]
+    },
+
     "config-audit": {
       "name": "Server configuration security audit",
       "skill": "config-audit",

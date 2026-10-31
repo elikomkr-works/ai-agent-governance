@@ -1248,6 +1248,19 @@ def intake_checks():
     basic = intake.intake_text(data, svc_key, "basic", "X", today="2026-10-30")
     yield "üst pakete ait girdi alt pakette sorulmaz", "**logs**" not in basic
 
+    # Oltalama hizmeti: rapor adı ve kapsam sınırı katalogda sabit durur.
+    phish = data["services"]["phishing-triage"]
+    yield "oltalama rapor eki 'phish'", phish["report_slug"] == "phish"
+    phish_blockers = {i["id"] for i in phish["intake"] if i.get("blocker")}
+    # Tıklama sorusu zorunlu: 'evet' ise iş e-postayı aşar ve incident-response'a döner.
+    yield "oltalama tıklama sorusu zorunlu", "clicked" in phish_blockers
+    yield "oltalama e-posta dosyası zorunlu", "email_files" in phish_blockers
+    phish_text = intake.intake_text(data, "phishing-triage", "standard", "X", today="2026-10-31")
+    phish_msg = phish_text.split("```")[1]
+    # Sınır etiketi sözlükte olmalı; yoksa müşteri mesajında ham anahtar ('emailss') görünür.
+    yield "oltalama e-posta sınırı etiketli yazılır", "3 emails" in phish_msg and "emailss" not in phish_msg
+    yield "oltalama mesajında iç etiket yok", not any(m in phish_msg for m in langs)
+
     yield "sipariş klasörü iş panosu altında", intake.order_folder(
         svc_key, "Acme GmbH", today="2026-10-30").parent == P("work")
     yield "müşteri adı dosya adına uygun hale gelir", intake.order_folder(

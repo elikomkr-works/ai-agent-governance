@@ -1,0 +1,18 @@
+{
+  "skill": {
+    "name": "phishing-triage",
+    "purpose": "Statically review a suspicious email the customer exported (.eml or a plain-text header export) read-only — Received chain, the SPF/DKIM/DMARC results recorded by the receiving gateway, the From / Reply-To / Return-Path split and display-name mismatch, URL and attachment inventory — and write an evidence-backed triage report with a six-item checklist (P1-P6)",
+    "triggers": ["oltalama", "phishing", "şüpheli e-posta", "suspicious email", "sahte mail", "spoofed sender", "başlık analizi", "header analysis", "SPF", "DKIM", "DMARC", "Received zinciri", "kimlik avı", "ekteki dosya", "e-posta eki", "email attachment", "BEC", "fatura dolandırıcılığı", "invoice fraud"],
+    "required_input": ["local path of the email file (.eml or a plain-text export of the full headers and body)"],
+    "network_access": false,
+    "risk": "medium",
+    "risk_reason": "No network access, no shell, read-only. The input is attacker-written content: the body is treated as data and never as instructions, URLs are listed defanged and never visited, fetched, resolved or expanded, and attachments are never executed, decoded or written out. The agent holds no WebFetch/WebSearch and no Bash, so a phishing URL is unreachable by construction rather than only by rule. Attachment hashing and reputation lookups are out of scope in v1 and route to cve-researcher through quarantine plus user approval.",
+    "output": "@reports"
+  },
+  "agent": {
+    "name": "phishing-analyst",
+    "role": "Phishing Triage Analyst — static review of a customer-exported suspicious email, read-only, no shell and no network tool",
+    "skills": ["phishing-triage"],
+    "writes": ["@reports", "@work"]
+  }
+}
