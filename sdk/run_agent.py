@@ -1,7 +1,7 @@
 """Run a governed agent from a standalone Python application.
 
     python sdk/run_agent.py --selftest
-    python sdk/run_agent.py --agent log-analyst --task "Analyse samples/ornek-auth.log"
+    python sdk/run_agent.py --agent log-analyst --task "Analyse samples/auth.log"
 
 `--selftest` puts a table of synthetic tool calls through the Policy Gate and the
 Validator and prints each decision beside the expected one. It calls no model,

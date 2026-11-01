@@ -45,11 +45,18 @@ import validator  # noqa: E402
 PRE_EVENT = "PreToolUse"
 READ_ONLY = ("Read", "Grep", "Glob")
 
+# The governed run's agent name. In Claude Code the hook input carries `agent_type`
+# for a subagent call; here the agent *is* the run, so nothing in the SDK's hook
+# input names it and the audit record would lose the one field that says who acted.
+_RUN_AGENT = None
+
 
 def _event(data, name):
     """The hook event dict, with the event name the hook modules branch on."""
     out = dict(data or {})
     out["hook_event_name"] = out.get("hook_event_name") or name
+    if _RUN_AGENT and not (out.get("agent_type") or out.get("agent_id")):
+        out["agent_type"] = _RUN_AGENT
     return out
 
 
@@ -142,6 +149,7 @@ def build_options(agent=None, model=None, cwd=None, max_turns=20, **extra):
             "claude-agent-sdk is not installed. Run: pip install -r sdk/requirements.txt"
         ) from e
 
+    global _RUN_AGENT
     tools = None
     if agent is not None:
         tools = agent_tools(agent)
@@ -149,6 +157,7 @@ def build_options(agent=None, model=None, cwd=None, max_turns=20, **extra):
             raise ValueError(
                 f"'{agent}' is not in {govlib.rel('agents_registry')}; "
                 "an unregistered agent is a user decision, not this layer's")
+    _RUN_AGENT = agent
 
     options = dict(
         cwd=str(cwd or ROOT),

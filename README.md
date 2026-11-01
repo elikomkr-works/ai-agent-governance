@@ -43,7 +43,7 @@ The design rule: anything an agent could benefit from skipping is enforced in co
 
 | | |
 |---|---|
-| Test suite | **543 assertions across 18 areas**, all passing — Policy Gate, Validator, audit-chain integrity, agent-fleet drift, customer intake, deliverable language rules, harness portability |
+| Test suite | **549 assertions across 18 areas**, all passing — Policy Gate, Validator, audit-chain integrity, agent-fleet drift, customer intake, deliverable language rules, harness portability |
 | CI | GitHub Actions on every push: tests, hook launcher on Linux, audit-chain verification against git history |
 | Python | ~4,100 lines (hooks, 8 operator tools, test suite) |
 | Agents | 9 specialists + lead orchestrator |
@@ -138,7 +138,7 @@ application cannot grant a privilege the definition withholds. Details in
 ## Running it
 
 ```bash
-python3 tests/test_governance.py      # 543 assertions (use `python` on Windows)
+python3 tests/test_governance.py      # 549 assertions (use `python` on Windows)
 python3 sdk/run_agent.py --selftest   # enforcement decisions, no model call
 python3 tools/verify_audit.py         # audit-chain integrity
 python3 tools/build_site.py           # dashboard → site/index.html
@@ -162,5 +162,5 @@ A set of label strings stays Turkish deliberately, because the Validator and the
 - **The Policy Gate reads command text.** Layer 1 alone is defeatable; it is deliberately paired with an OS sandbox and an append-only log rather than trusted on its own.
 - **The sandbox does not cover native Windows.** Commands run unsandboxed there. The gate detects the environment and tightens its own behaviour in response, but the OS layer is genuinely absent.
 - **The reviewer is an agent.** It is read-only, independent, and recounts from source, which catches arithmetic and unsupported claims. It is not a substitute for a human on a high-stakes finding — and after two failed rounds the system presents the result labelled *not verified* rather than quietly passing it.
-- **The SDK layer's enforcement is tested; its model run is not.** `--selftest`, the decision functions and the hook-parity comparison are covered by the suite and pass. A full `--agent` + `--task` run against a live model has not been exercised here, because `claude-agent-sdk` is not installed in this environment.
+- **The SDK layer's model run has been exercised once, not hardened.** On 2026-11-01 `--agent log-analyst --task "Analyse samples/auth.log"` ran against a live model: 8 turns, $0.3594, and a report the in-process Validator accepted. The audit log carries that run under its own session id — a Gate decision for every Glob, Read, Bash and Write, then the Validator verdict — which is how we know the enforcement held outside Claude Code's own hook process. Two honest limits: every call in that run was allowed, so a live *denial* has so far only been shown in the selftest, and the report it produced has not been through the reviewer.
 - **Scope is narrow by design.** Defensive analysis of files the customer exports. No server access, no active scanning, no offensive tooling — in any package, at any price.

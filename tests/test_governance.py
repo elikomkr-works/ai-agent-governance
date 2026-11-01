@@ -1353,6 +1353,27 @@ def sdk_checks():
             r["event"] == "PreToolUse" and r["decision"] == "deny" for r in recs)
         yield "denetim zinciri sağlam", verify_audit.verify(tmp / "audit.jsonl", tmp / "approved")[1] == []
 
+        # Koşunun agent adı kayda damgalanmalı: SDK hook girdisinde agent_type yok,
+        # runtime koymazsa kaydın "kim yaptı" alanı boş kalır.
+        stamped = runtime._event({"tool_name": "Read"}, "PreToolUse")
+        yield "agent damgası yoksa boş kalır", stamped.get("agent_type") in (None, "")
+        runtime._RUN_AGENT = "log-analyst"
+        try:
+            runtime.decide_pre_tool_use(
+                {"tool_name": "Read", "tool_input": {"file_path": R("samples") + "/auth.log"}})
+        finally:
+            runtime._RUN_AGENT = None
+        recs = [json.loads(ln) for ln in
+                (tmp / "audit.jsonl").read_text(encoding="utf-8").splitlines()]
+        yield "SDK koşusunun agent adı kayda yazılır", any(
+            r.get("agent") == "log-analyst" for r in recs)
+        runtime._RUN_AGENT = "log-analyst"
+        try:
+            carried = runtime._event({"agent_type": "reviewer"}, "PreToolUse")["agent_type"]
+        finally:
+            runtime._RUN_AGENT = None
+        yield "hook girdisindeki agent adı ezilmez", carried == "reviewer"
+
         # Gate'in kendisi patlarsa kapı açılmaz (fail-closed), hook'la aynı davranış.
         broken = lambda: (_ for _ in ()).throw(RuntimeError("bozuk politika"))
         real, govlib.load_policy = govlib.load_policy, broken

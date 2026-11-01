@@ -47,13 +47,19 @@ For a real governed run:
 
 ```bash
 pip install -r sdk/requirements.txt
-python sdk/run_agent.py --agent log-analyst --task "Analyse samples/ornek-auth.log"
+python sdk/run_agent.py --agent log-analyst --task "Analyse samples/auth.log"
 ```
 
 The agent's tool list comes from `governance/agents_registry.json` — the same file
 the drift tests check against the agent definitions — so this layer cannot grant a
 privilege the definition does not. An agent name that is not in the registry is
 refused here, because admitting one is a user decision.
+
+That run was executed on 2026-11-01: 8 turns, $0.3594, and a report the in-process
+Validator accepted. It appears in the audit log under its own session id, with a
+Gate decision for every tool call and the Validator verdict after the write — the
+run's agent name is stamped on each record, because the SDK's hook input does not
+carry one the way a Claude Code subagent call does.
 
 ## Two things worth knowing
 
