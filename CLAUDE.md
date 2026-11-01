@@ -116,8 +116,19 @@ What is sold, what each package includes and what the customer must send before 
 - `common.never` is what is never requested or promised, in any package (server access, secrets, active scanning, offensive testing). It goes into the customer message verbatim.
 - Adding a service or package = a block in `services.json` plus a case in `tests/test_governance.py`; no code change. The "Müşteri alımı" tests check the catalogue against the skill and agent registries, so a service cannot name a skill or agent that does not exist.
 
+## Agent SDK layer
+`sdk/` runs the same enforcement from a standalone Python application on `claude-agent-sdk`:
+`sdk/governance_runtime.py` calls `policy_gate.evaluate` / `validator.handle` as in-process hook
+callbacks and audits through `govlib.audit`. It is an adapter — a policy rule is never duplicated
+there, and the tests compare every SDK decision with the hook process's decision on the same input.
+`setting_sources=[]` is deliberate: with filesystem settings loaded the CLI underneath would run the
+`.claude/settings.json` command hooks too, so every call would pass the Gate twice. An agent's tool
+list comes from `agents_registry.json`, so this layer cannot grant a privilege the definition withholds.
+`python3 sdk/run_agent.py --selftest` proves the enforcement without a model call. See `sdk/README.md`.
+
 ## Commands
 - Hook tests: `python3 tests/test_governance.py` (`python` on Windows)
+- SDK layer selftest: `python3 sdk/run_agent.py --selftest` → Gate/Validator decisions, no model call
 - Customer intake: `python3 tools/intake.py [<service> <package>] [--siparis "<customer>"]` → catalogue / intake list / order folder
 - Deliverable PDF: `python3 tools/to_pdf.py deliverables/<file>.md` → PDF beside the Markdown
 - Audit panel: `python3 tools/build_site.py` → `site/index.html` (read-only, opens in a browser). Lists the audit records plus the reports, knowledge records and customer deliverables (each deliverable with its source report's reviewer verdict and whether its PDF exists). CI publishes the panel to GitHub Pages on `main`.

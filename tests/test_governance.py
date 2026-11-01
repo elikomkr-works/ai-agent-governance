@@ -1317,6 +1317,103 @@ def intake_checks():
         shutil.rmtree(folder, ignore_errors=True)
 
 
+def sdk_checks():
+    """Agent SDK katmanı hook'larla aynı kararı veriyor mu: (açıklama, sonuç).
+
+    Bu katmanın tek işi uyarlamak; politika kararı policy_gate ve validator'da
+    kalır. Burada sınanan da bu: aynı girdi, iki koşucu, aynı karar. Bir vaka
+    ayrışırsa SDK katmanında ikinci bir politika kopyası oluşmuş demektir.
+    """
+    sys.path.insert(0, str(P("sdk")))
+    import governance_runtime as runtime  # noqa: PLC0415 - yol eklendikten sonra
+    import run_agent  # noqa: PLC0415
+
+    yield "sdk klasörü yol kaydında", (ROOT / R("sdk")).is_dir()
+
+    tmp = Path(tempfile.mkdtemp(prefix="gov_sdk_"))
+    saved = os.environ.get("GOV_AUDIT_LOG")
+    try:
+        os.environ["GOV_AUDIT_LOG"] = str(tmp / "audit.jsonl")
+        (tmp / "approved").mkdir()  # verify_audit onay klasörünü ayrı ister
+
+        for label, tool, expected, actual in run_agent.selftest_rows(runtime):
+            yield f"{label}: SDK kararı {expected}", actual == expected
+
+        # Aynı girdi hook sürecine verildiğinde de aynı karar çıkmalı.
+        for label, tool, tool_input, expected in run_agent.SELFTEST_CASES:
+            yield f"{label}: hook ile aynı", gate(tool, **tool_input) == expected
+
+        denied = runtime.decide_pre_tool_use(
+            {"tool_name": "Bash", "tool_input": {"command": "nmap -sV 8.8.8.8"}})
+        reason = denied["hookSpecificOutput"]["permissionDecisionReason"]
+        yield "ret gerekçesi Policy Gate etiketli", reason.startswith("[Policy Gate]")
+        recs = [json.loads(ln) for ln in
+                (tmp / "audit.jsonl").read_text(encoding="utf-8").splitlines()]
+        yield "SDK kararı denetim kaydına yazılır", any(
+            r["event"] == "PreToolUse" and r["decision"] == "deny" for r in recs)
+        yield "denetim zinciri sağlam", verify_audit.verify(tmp / "audit.jsonl", tmp / "approved")[1] == []
+
+        # Gate'in kendisi patlarsa kapı açılmaz (fail-closed), hook'la aynı davranış.
+        broken = lambda: (_ for _ in ()).throw(RuntimeError("bozuk politika"))
+        real, govlib.load_policy = govlib.load_policy, broken
+        try:
+            out = runtime.decide_pre_tool_use(
+                {"tool_name": "Bash", "tool_input": {"command": "echo ok"}})
+        finally:
+            govlib.load_policy = real
+        yield "gate çökerse reddeder", out["hookSpecificOutput"]["permissionDecision"] == "deny"
+
+        missing = runtime.decide_validator(
+            {"tool_name": "Write", "tool_input": {"file_path": R("reports") + "/yok.md"}},
+            "PostToolUse")
+        yield "Validator olmayan raporu engeller", missing.get("decision") == "block"
+        web = runtime.decide_validator(
+            {"tool_name": "WebFetch", "tool_input": {"url": "https://example.com"}},
+            "PostToolUse")
+        yield "WebFetch karantina uyarısı taşınır", "quarantine" in json.dumps(web)
+    finally:
+        if saved is None:
+            os.environ.pop("GOV_AUDIT_LOG", None)
+        else:
+            os.environ["GOV_AUDIT_LOG"] = saved
+        shutil.rmtree(tmp, ignore_errors=True)
+
+    registry = {a["name"] for a in govlib.load_json(P("agents_registry"))["agents"]}
+    yield "araç listesi reyestrden gelir", all(
+        runtime.agent_tools(n) == entry.get("tools")
+        for entry in govlib.load_json(P("agents_registry"))["agents"]
+        for n in [entry["name"]])
+    yield "kayıtsız agent'ın araç listesi yok", runtime.agent_tools("yok-boyle-bir-agent") is None
+    yield "reyestr boş değil", bool(registry)
+
+    try:
+        import claude_agent_sdk  # noqa: F401, PLC0415
+        has_sdk = True
+    except ImportError:
+        has_sdk = False
+    if has_sdk:
+        opts = runtime.build_options(agent="log-analyst")
+        yield "dosya ayarları yüklenmez (hook iki kez çalışmaz)", opts.setting_sources == []
+        yield "izinli araçlar reyestrdeki liste", list(opts.allowed_tools) == runtime.agent_tools("log-analyst")
+        yield "üç hook kaydı var", set(opts.hooks) == {"PreToolUse", "PostToolUse", "Stop"}
+        bad_agent = False
+        try:
+            runtime.build_options(agent="yok-boyle-bir-agent")
+        except ValueError:
+            bad_agent = True
+        yield "kayıtsız agent ile çalışmaz", bad_agent
+    else:
+        hint = ""
+        try:
+            runtime.build_options(agent="log-analyst")
+        except ImportError as e:
+            hint = str(e)
+        yield "SDK kurulu değilse kurulum satırı gösterilir", "sdk/requirements.txt" in hint
+
+    req = (ROOT / R("sdk") / "requirements.txt").read_text(encoding="utf-8")
+    yield "requirements claude-agent-sdk pinler", "claude-agent-sdk" in req
+
+
 def main():
     sys.stdout.reconfigure(encoding="utf-8")
     failures = 0
@@ -1455,6 +1552,10 @@ def main():
 
     print("== Bilgi onayı ==")
     for label, ok in approval_checks():
+        report(ok, label)
+
+    print("== Agent SDK katmanı ==")
+    for label, ok in sdk_checks():
         report(ok, label)
 
     print(f"\nSonuç: {failures} başarısız" if failures else "\nSonuç: tüm testler geçti")

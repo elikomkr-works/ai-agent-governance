@@ -43,7 +43,7 @@ The design rule: anything an agent could benefit from skipping is enforced in co
 
 | | |
 |---|---|
-| Test suite | **511 assertions across 17 areas**, all passing — Policy Gate, Validator, audit-chain integrity, agent-fleet drift, customer intake, deliverable language rules |
+| Test suite | **543 assertions across 18 areas**, all passing — Policy Gate, Validator, audit-chain integrity, agent-fleet drift, customer intake, deliverable language rules, harness portability |
 | CI | GitHub Actions on every push: tests, hook launcher on Linux, audit-chain verification against git history |
 | Python | ~4,100 lines (hooks, 8 operator tools, test suite) |
 | Agents | 9 specialists + lead orchestrator |
@@ -109,10 +109,37 @@ The rules that keep a wide wave from collapsing came out of watching it collapse
 
 ---
 
+## Not only in Claude Code
+
+If a policy exists only because one harness calls a hook, it is a configuration
+rather than an architecture. `sdk/` settles that: the same two enforcement modules
+run as in-process callbacks of a standalone Python application on the Claude Agent
+SDK. Nothing is re-implemented — the hook modules expose pure functions over the
+event dict, and the decision shape Claude Code expects is the shape the Agent SDK
+expects, so the adapter is thin on purpose.
+
+```bash
+python3 sdk/run_agent.py --selftest
+```
+
+That runs ten synthetic tool calls through the gate and prints each decision beside
+the expected one — no model call, no network, no API key. The test suite then does
+the comparison that matters: for each case it checks the decision made in-process
+by the SDK layer against the decision made by the hook *process* on the same input.
+A divergence would mean a second copy of the policy had appeared in the new layer.
+
+The agent's tool list in that layer is read from `governance/agents_registry.json`,
+the same file the drift tests check against the agent definitions, so the SDK
+application cannot grant a privilege the definition withholds. Details in
+`sdk/README.md`.
+
+---
+
 ## Running it
 
 ```bash
-python3 tests/test_governance.py      # 511 assertions (use `python` on Windows)
+python3 tests/test_governance.py      # 543 assertions (use `python` on Windows)
+python3 sdk/run_agent.py --selftest   # enforcement decisions, no model call
 python3 tools/verify_audit.py         # audit-chain integrity
 python3 tools/build_site.py           # dashboard → site/index.html
 python3 tools/intake.py               # service catalogue
@@ -135,4 +162,5 @@ A set of label strings stays Turkish deliberately, because the Validator and the
 - **The Policy Gate reads command text.** Layer 1 alone is defeatable; it is deliberately paired with an OS sandbox and an append-only log rather than trusted on its own.
 - **The sandbox does not cover native Windows.** Commands run unsandboxed there. The gate detects the environment and tightens its own behaviour in response, but the OS layer is genuinely absent.
 - **The reviewer is an agent.** It is read-only, independent, and recounts from source, which catches arithmetic and unsupported claims. It is not a substitute for a human on a high-stakes finding — and after two failed rounds the system presents the result labelled *not verified* rather than quietly passing it.
+- **The SDK layer's enforcement is tested; its model run is not.** `--selftest`, the decision functions and the hook-parity comparison are covered by the suite and pass. A full `--agent` + `--task` run against a live model has not been exercised here, because `claude-agent-sdk` is not installed in this environment.
 - **Scope is narrow by design.** Defensive analysis of files the customer exports. No server access, no active scanning, no offensive tooling — in any package, at any price.
