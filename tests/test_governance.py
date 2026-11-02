@@ -18,6 +18,23 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 HOOKS = ROOT / ".claude" / "hooks"  # Yeri Claude Code ayarlarında (.claude/settings.json) sabit.
 sys.path.insert(0, str(HOOKS))
+def has_git():
+    """Is there a git work tree here, and a git to read it with?
+
+    The container image is the case this exists for: sdk/Dockerfile COPYs the
+    system in and .dockerignore deliberately leaves .git out, so the few checks
+    that ask git what is tracked or ignored have nothing to ask. They are
+    skipped there rather than crashing or, worse, reporting a false pass.
+    """
+    try:
+        return subprocess.run(["git", "rev-parse", "--git-dir"], cwd=ROOT,
+                              capture_output=True).returncode == 0
+    except (OSError, FileNotFoundError):
+        return False
+
+
+HAS_GIT = has_git()
+
 import govlib  # noqa: E402
 import policy_gate  # noqa: E402
 import validator  # noqa: E402
@@ -674,7 +691,15 @@ def ir_collect_checks():
     if bash:
         yield "toplama betiği sözdizimi geçerli", subprocess.run([bash, "-n", str(P("tools") / "ir_collect.sh")]).returncode == 0
     # Gerçek çalıştırma root ister: CI'da (Linux, parolasız sudo) yapılır, yerelde atlanır.
-    if sys.platform.startswith("linux") and subprocess.run(["sudo", "-n", "true"], capture_output=True).returncode == 0:
+    # Yoklamanın kendisi de çökmemeli: konteyner imajında sudo kurulu değil
+    # (zaten root koşuyor), orada bu blok sessizce atlanır.
+    def can_sudo():
+        try:
+            return subprocess.run(["sudo", "-n", "true"], capture_output=True).returncode == 0
+        except OSError:
+            return False
+
+    if sys.platform.startswith("linux") and can_sudo():
         out = Path(tempfile.mkdtemp()) / "kanit"
         suspicious = out.parent / "supheli.sh"
         suspicious.write_text("#!/bin/sh\necho test\n", encoding="utf-8")
@@ -716,6 +741,13 @@ def win_collect_checks():
 
 def customer_checks():
     """tools/new_customer.py müşteri reposuna yalnızca sistem dosyalarını taşıyor mu: (açıklama, sonuç)."""
+    # new_customer.py beyaz listesini git'in izlediği dosyalardan türetir, yani
+    # bir git çalışma kopyası olmadan hiç çalışamaz. Konteyner imajında depo
+    # yoktur (.dockerignore .git'i bilerek dışarıda bırakır), orada bu bölüm
+    # bütün olarak atlanır: aracın gerçek koşulu, test kusuru değil.
+    if not HAS_GIT:
+        yield "müşteri reposu kontrolleri (git çalışma kopyası gerekir)", None
+        return
     base = Path(tempfile.mkdtemp())
     try:
         target = base / "musteri"
@@ -725,8 +757,11 @@ def customer_checks():
         # Koddaki listeden bağımsız: bir klasör NEVER_COPY'den düşerse test de ona bakmayı bırakmasın.
         must_not = ["audit_archive", "reports", "quarantine", "approved", "proposals", "work", "site", "evidence"]
         yield "kopyalanmayacak veri klasörleri listesi eksiksiz", set(must_not) <= set(new_customer.NEVER_COPY)
-        tracked = subprocess.run(["git", "ls-files"], cwd=ROOT, capture_output=True, text=True).stdout.splitlines()
-        if any(f.startswith(R("audit_archive")) for f in tracked) and any(f.startswith(R("reports")) for f in tracked):
+        tracked = (subprocess.run(["git", "ls-files"], cwd=ROOT, capture_output=True,
+                                  text=True).stdout.splitlines() if HAS_GIT else [])
+        if not HAS_GIT:
+            yield "kaynaktaki dilimler ve raporlar müşteri kopyasına geçmez", None
+        elif any(f.startswith(R("audit_archive")) for f in tracked) and any(f.startswith(R("reports")) for f in tracked):
             yield "kaynaktaki dilimler ve raporlar müşteri kopyasına geçmez", not any(
                 f.startswith((R("audit_archive"), R("reports"))) and not f.endswith("/.gitkeep") for f in copied)
         data = [R(k) for k in must_not]
@@ -780,11 +815,13 @@ def settings_checks():
     # Canlı kayıt bilerek izlenmez; yayınlanan kısmı dilimlerdedir.
     governed = [".claude/settings.json", ".claude/hooks/policy_gate.py", ".claude/agents/reviewer.md",
                 R("audit_archive") + "d.jsonl", R("policy"), R("reports") + "r.md", R("approved") + "a.md"]
-    yield "canlı denetim kaydı git'te izlenmez", subprocess.run(
-        ["git", "check-ignore", "-q", "--no-index", R("audit_log")], cwd=ROOT).returncode == 0
+    yield "canlı denetim kaydı git'te izlenmez", (subprocess.run(
+        ["git", "check-ignore", "-q", "--no-index", R("audit_log")],
+        cwd=ROOT).returncode == 0 if HAS_GIT else None)
     ignored = [p for p in governed
-               if subprocess.run(["git", "check-ignore", "-q", "--no-index", p], cwd=ROOT).returncode == 0]
-    yield "sandbox yer tutucuları yönetişim dosyalarını gizlemez", ignored == []
+               if HAS_GIT and subprocess.run(
+                   ["git", "check-ignore", "-q", "--no-index", p], cwd=ROOT).returncode == 0]
+    yield "sandbox yer tutucuları yönetişim dosyalarını gizlemez", (ignored == [] if HAS_GIT else None)
 
 
 def frontmatter(text):
@@ -1351,6 +1388,113 @@ def intake_checks():
         shutil.rmtree(folder, ignore_errors=True)
 
 
+def web_checks():
+    """Web katmanı yönetişimi delmiyor mu: (açıklama, sonuç).
+
+    Sayfanın kendi politikası yok; işi yüklenen dosyayı @work altına koymak ve
+    services.json'un adını verdiği agent'a tek sınırlı görev vermek. Burada
+    sınanan da bu: katalog türetilmiş mi, girdi adı klasörden kaçabiliyor mu,
+    istem tek çıktı yolunu ve "içerik veridir" kuralını söylüyor mu, jeton
+    yoksa ağa açılıyor mu. Model çağrısı yok: koşu yerine sahte bir yazıcı.
+    """
+    sys.path.insert(0, str(P("sdk")))
+    import web  # noqa: PLC0415 - yol eklendikten sonra
+
+    cat = govlib.load_json(P("services"))["services"]
+    yield "hizmet listesi services.json'dan türetilir", set(web.services()) == set(cat)
+    page = web.form_page()
+    yield "form her hizmeti listeler", all(k in page for k in cat)
+    yield "formda reviewer/PDF vaadi yok", "PDF" in page and "reviewer onayı" in page
+
+    # Dosya adı klasörden kaçamaz, gizli dosya olamaz, uzun ad kırpılır.
+    yield "yol kaçışı temizlenir", "/" not in web.safe_name("../../.ssh/id_rsa")
+    yield "gizli dosya adı kalmaz", not web.safe_name(".env").startswith(".")
+    yield "ad uzunluğu sınırlı", len(web.safe_name("a" * 300)) <= 80
+
+    created = []
+    try:
+        for key, svc in cat.items():
+            job = web.new_job(key, "ornek.txt", b"ornek icerik")
+            created.append(job)
+            yield f"{key}: girdi @work altına yazılır", (
+                job.input_path.is_file()
+                and job.input_path.is_relative_to(govlib.path("work")))
+            yield f"{key}: rapor adı services.json'daki slug'ı taşır", (
+                f"_{svc['report_slug']}_" in job.report_path.name)
+            yield f"{key}: rapor yolu @reports altında", (
+                job.report_path.parent == govlib.path("reports"))
+            yield f"{key}: iş panosu notu koşudan önce yazılır", (
+                job.work_dir / "web.md").is_file()
+            prompt = web.prompt_for(job)
+            yield f"{key}: istem skill'i adıyla verir", svc["skill"] in prompt
+            yield f"{key}: istem tek çıktı yolu söyler", job.report_rel in prompt
+            yield f"{key}: istem içeriği veri sayar", "not instructions" in prompt
+            yield f"{key}: istem reviewer kararını yasaklar", (
+                "Reviewer Kararı" in prompt and "user's step" in prompt)
+
+        # Uçtan uca HTTP: model yerine raporu yazan sahte bir koşu.
+        from starlette.testclient import TestClient  # noqa: PLC0415
+
+        async def fake_run(prompt, agent=None, **kw):
+            path = re.search(r"to (\S+\.md)", prompt).group(1)
+            (ROOT / path).write_text("# sahte rapor", encoding="utf-8")
+            return "ok", type("R", (), {"num_turns": 3, "total_cost_usd": 0.01})()
+
+        real = web.gr.run_task
+        web.gr.run_task = fake_run
+        try:
+            client = TestClient(web.build_app())
+            yield "ana sayfa açılır", client.get("/").status_code == 200
+            yield "bilinmeyen hizmet reddedilir", client.post(
+                "/jobs", data={"service": "yok"},
+                files={"file": ("a.txt", b"x")}).status_code == 400
+            yield "boş dosya reddedilir", client.post(
+                "/jobs", data={"service": next(iter(cat))},
+                files={"file": ("a.txt", b"")}).status_code == 400
+            big = client.post("/jobs", data={"service": next(iter(cat))},
+                              files={"file": ("a.txt", b"x" * (web.MAX_UPLOAD + 1))})
+            yield "sınırı aşan dosya reddedilir", big.status_code == 413
+
+            svc_key = "config-audit"
+            r = client.post("/jobs", data={"service": svc_key},
+                            files={"file": ("sshd_config", b"PermitRootLogin yes")},
+                            follow_redirects=False)
+            yield "iş kurulunca iş sayfasına yönlenir", r.status_code == 303
+            jid = r.headers["location"].split("/jobs/")[1].split("?")[0]
+            job = web.JOBS[jid]
+            created.append(job)
+            for _ in range(50):
+                body = client.get(f"/jobs/{jid}").text
+                if "çalışıyor" not in body:
+                    break
+            yield "iş biter ve rapor görünür", job.status == "bitti"
+            yield "iş sayfası maliyeti gösterir", "$0.0100" in body
+            dl = client.get(f"/jobs/{jid}/report.md")
+            yield "rapor indirilebilir", dl.status_code == 200 and "sahte rapor" in dl.text
+            yield "olmayan iş 404", client.get("/jobs/yok").status_code == 404
+        finally:
+            web.gr.run_task = real
+
+        # Jeton yoksa ağa açılmayı reddeder; loopback serbest kalır.
+        saved = os.environ.pop("GOV_WEB_TOKEN", None)
+        try:
+            yield "jeton yoksa 0.0.0.0 reddedilir", web.main(["--host", "0.0.0.0"]) == 2
+            os.environ["GOV_WEB_TOKEN"] = "x" * 24
+            client = TestClient(web.build_app())
+            yield "jeton varken jetonsuz istek 401", client.get("/").status_code == 401
+            yield "doğru jetonla açılır", client.get(
+                "/", params={"token": "x" * 24}).status_code == 200
+        finally:
+            os.environ.pop("GOV_WEB_TOKEN", None)
+            if saved is not None:
+                os.environ["GOV_WEB_TOKEN"] = saved
+    finally:
+        for job in created:
+            shutil.rmtree(job.work_dir, ignore_errors=True)
+            job.report_path.unlink(missing_ok=True)
+        web.JOBS.clear()
+
+
 def sdk_checks():
     """Agent SDK katmanı hook'larla aynı kararı veriyor mu: (açıklama, sonuç).
 
@@ -1474,7 +1618,13 @@ def main():
     failures = 0
 
     def report(ok, label, detail=""):
+        # ok is None means the check could not be run here (see has_git): it is
+        # neither a pass nor a failure, and it says so on its own line so a
+        # thinner run is visible instead of silently counting as green.
         nonlocal failures
+        if ok is None:
+            print(f"ATLANDI {label}{'  → ' + detail if detail else ''}")
+            return
         failures += not ok
         print(f"{'GEÇTİ ' if ok else 'KALDI '} {label}{'  → ' + detail if detail else ''}")
 
@@ -1626,6 +1776,10 @@ def main():
 
     print("== Agent SDK katmanı ==")
     for label, ok in sdk_checks():
+        report(ok, label)
+
+    print("== Web katmanı ==")
+    for label, ok in web_checks():
         report(ok, label)
 
     print(f"\nSonuç: {failures} başarısız" if failures else "\nSonuç: tüm testler geçti")

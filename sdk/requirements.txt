@@ -1,1 +1,8 @@
 claude-agent-sdk>=0.2.139
+
+# sdk/web.py only. Starlette and uvicorn ship as dependencies of the SDK's own
+# CLI, so a working install usually already has them; they are pinned here
+# because the server deployment must not depend on that coincidence.
+starlette>=0.40
+uvicorn>=0.30
+python-multipart>=0.0.9

@@ -1,0 +1,38 @@
+# The build context is the repository root, so without this file the daemon
+# receives the git history, the published panel and every customer artefact ever
+# produced here. The image needs the system, not the data.
+
+# Git history and CI
+.git
+.gitignore
+.github
+
+# Run and customer data. The deliverables and the host evidence folder are
+# customer property and must never be baked into an image that could be pushed
+# to a registry. The audit log and its slices are mounted at run time instead,
+# so the hash chain survives a container restart.
+work
+reports
+deliverables
+evidence
+knowledge
+samples
+examples
+site
+governance/audit.jsonl
+governance/audit_archive
+
+# Build and editor noise
+**/__pycache__
+**/*.pyc
+**/*.pyo
+.pytest_cache
+.venv
+venv
+node_modules
+*.pdf
+*.log
+
+# Windows / OneDrive artefacts
+desktop.ini
+Thumbs.db

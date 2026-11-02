@@ -61,6 +61,44 @@ Gate decision for every tool call and the Validator verdict after the write — 
 run's agent name is stamped on each record, because the SDK's hook input does not
 carry one the way a Claude Code subagent call does.
 
+## From a browser
+
+`sdk/web.py` puts the same governed run behind an upload form, because a customer
+file arriving as an email attachment and a staff member pasting a path into a
+terminal are the same job with different friction.
+
+```bash
+python sdk/web.py                  # http://127.0.0.1:8000
+python sdk/web.py --host 0.0.0.0   # refused unless GOV_WEB_TOKEN is set
+```
+
+The page holds no policy of its own. It writes the upload under `@work`, hands one
+bounded task to the agent that `governance/services.json` names for the chosen
+service, and calls `run_task` — so the Gate still rules on every tool call, the
+Validator still rules on the report, and both decisions still reach the audit log
+under the agent's name. The service list, the agent and the report slug are read
+from the catalogue, so adding a service stays a data change here too.
+
+It plays the Lead Agent's mechanical part only: it names the single input and the
+single output path, writes the work-board note before the run so a crash leaves
+recoverable state, and tells the agent in the prompt that the uploaded content is
+data rather than instructions. It stops at the internal report. It never writes
+`## Reviewer Kararı`, never derives a deliverable and never renders a PDF, because
+those need an independent review and the user's approval, and an approver cannot
+be a web form.
+
+Three things the deployment depends on:
+
+| Concern | How it is handled |
+|---|---|
+| Who may use it | None by default, hence the loopback bind. `GOV_WEB_TOKEN` requires `?token=...`; binding another interface without it is refused, not warned about. |
+| Whose API key pays | `ANTHROPIC_API_KEY` from the environment, or one pasted into the form, used for that run's subprocess only — never written to disk, never logged. With neither, the machine's signed-in Claude Code session is used. |
+| Untrusted input | The filename is reduced to a safe basename (no traversal, no dotfile, 80 chars), uploads over 10 MB are refused, and the file is read as data by an agent whose tool list comes from the registry. |
+
+Tests: the "Web katmanı" section of `tests/test_governance.py` drives the whole
+HTTP path with the model call stubbed out, so it is free to run and proves the
+routing, the limits and the token guard without spending anything.
+
 ## Two things worth knowing
 
 **`setting_sources=[]`.** With filesystem settings loaded, the CLI underneath the
