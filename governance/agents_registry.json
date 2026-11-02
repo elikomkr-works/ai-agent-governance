@@ -16,6 +16,7 @@
     {"name": "skill-smith", "role": "Skill Smith — new skill/agent drafts", "skills": [], "writes": ["@proposals"], "tools": ["Read", "Glob", "Grep", "Write"]},
     {"name": "Explore", "role": "Built-in read-only search agent", "skills": [], "writes": [], "tools": [], "builtin": true},
     {"name": "Plan", "role": "Built-in planning agent", "skills": [], "writes": [], "tools": [], "builtin": true},
-    {"name": "phishing-analyst", "role": "Phishing Triage Analyst — static review of a customer-exported suspicious email, read-only, no shell and no network tool", "skills": ["phishing-triage"], "writes": ["@reports", "@work"], "tools": ["Read", "Grep", "Glob", "Write", "Skill"]}
+    {"name": "phishing-analyst", "role": "Phishing Triage Analyst — static review of a customer-exported suspicious email, read-only, no shell and no network tool", "skills": ["phishing-triage"], "writes": ["@reports", "@work"], "tools": ["Read", "Grep", "Glob", "Write", "Skill"]},
+    {"name": "vuln-triage-analyst", "role": "Vuln Triage Analyst — static triage of a customer-exported scanner report or dependency manifest into a prioritised, evidence-backed remediation plan, read-only, no shell and no network tool", "skills": ["vuln-triage"], "writes": ["@reports", "@work"], "tools": ["Read", "Grep", "Glob", "Write", "Skill"]}
   ]
 }
