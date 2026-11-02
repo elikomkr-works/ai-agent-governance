@@ -164,3 +164,9 @@ A set of label strings stays Turkish deliberately, because the Validator and the
 - **The reviewer is an agent.** It is read-only, independent, and recounts from source, which catches arithmetic and unsupported claims. It is not a substitute for a human on a high-stakes finding — and after two failed rounds the system presents the result labelled *not verified* rather than quietly passing it.
 - **The SDK layer's model run has been exercised once, not hardened.** On 2026-11-01 `--agent log-analyst --task "Analyse samples/auth.log"` ran against a live model: 8 turns, $0.3594, and a report the in-process Validator accepted. The audit log carries that run under its own session id — a Gate decision for every Glob, Read, Bash and Write, then the Validator verdict — which is how we know the enforcement held outside Claude Code's own hook process. Two honest limits: every call in that run was allowed, so a live *denial* has so far only been shown in the selftest, and the report it produced has not been through the reviewer.
 - **Scope is narrow by design.** Defensive analysis of files the customer exports. No server access, no active scanning, no offensive tooling — in any package, at any price.
+
+---
+
+## License
+
+MIT — see [LICENSE](LICENSE). Use, modify and redistribute freely, including commercially; keep the copyright notice and accept that the software comes with no warranty.
