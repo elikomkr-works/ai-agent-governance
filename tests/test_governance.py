@@ -215,6 +215,20 @@ Toplam: İZ VAR 6 + İZ YOK 0 + KANIT YOK 0 = 6.
 """
 GOOD_PHISH = GOOD_REPORT.replace("- `samples/auth.log:2`\n", PHISH_EVIDENCE)
 
+VULN_EVIDENCE = """### V1-V6 kontrol listesi
+| # | Kontrol | Nerede | Gerekçe | Sonuç |
+|---|---|---|---|---|
+| V1 | İhracat bütünlüğü | satır 1 | tarama kimlik doğrulamasız kaydedilmiş | İZ VAR |
+| V2 | Varlık eşleme | satır 12 | sahibi belirsiz çıplak IP | İZ VAR |
+| V3 | Tekilleştirme | satır 18, 24 | aynı kusur iki eklenti kimliğinde | İZ VAR |
+| V4 | Sürüm kanıtı | satır 31 | sürüm banner tahmininden geliyor | İZ VAR |
+| V5 | Maruziyet | satır 7 | internete bakan varlıkta 443 açık kayıtlı | İZ VAR |
+| V6 | Sömürü durumu | yok | onaylı kayıt yok | KANIT YOK |
+
+Toplam: İZ VAR 5 + İZ YOK 0 + KANIT YOK 1 = 6.
+"""
+GOOD_VULN = GOOD_REPORT.replace("- `samples/auth.log:2`\n", VULN_EVIDENCE).replace("KABUL", "BELİRSİZ")
+
 VALIDATOR_CASES = [
     ("geçerli olay müdahale raporu", validator.check_ir_report, GOOD_IR, True),
     ("kalıcılık maddesi eksik", validator.check_ir_report, GOOD_IR.replace("| K6 | İZ YOK | suid_sgid.txt |\n", ""), False),
@@ -237,6 +251,18 @@ VALIDATOR_CASES = [
      GOOD_PHISH.replace("| P1 | Received zinciri | satır 9 | `from localhost (unknown [198.51.100.7])` | İZ VAR |",
                         "| P1 | Received zinciri | yok | ihracat kesilmiş | KANIT YOK |").replace("KABUL", "BELİRSİZ"), True),
     ("oltalama raporunda hash aranmaz", validator.check_phish_report, GOOD_PHISH, True),
+    ("geçerli zafiyet raporu", validator.check_vuln_report, GOOD_VULN, True),
+    ("zafiyet maddesi eksik", validator.check_vuln_report,
+     GOOD_VULN.replace("| V3 | Tekilleştirme | satır 18, 24 | aynı kusur iki eklenti kimliğinde | İZ VAR |\n", ""), False),
+    ("zafiyet sonucu yazılmamış", validator.check_vuln_report,
+     GOOD_VULN.replace("sahibi belirsiz çıplak IP | İZ VAR |", "sahibi belirsiz çıplak IP | bakıldı |"), False),
+    ("zafiyette gerekçeye yazılan ikinci sonuç toplamı bozar", validator.check_vuln_report,
+     GOOD_VULN.replace("sürüm banner tahmininden geliyor |", "sürüm banner tahmininden geliyor, İZ YOK sayılmaz |"), False),
+    ("zafiyette KANIT YOK varken KABUL verilemez", validator.check_vuln_report,
+     GOOD_VULN.replace("BELİRSİZ", "KABUL"), False),
+    ("zafiyet raporunda hash aranmaz", validator.check_vuln_report,
+     GOOD_VULN.replace("| V6 | Sömürü durumu | yok | onaylı kayıt yok | KANIT YOK |",
+                       "| V6 | Sömürü durumu | knowledge/approved/x.md | sabit sürüm yazılı | İZ VAR |"), True),
     ("geçerli rapor", validator.check_report, GOOD_REPORT, True),
     ("bölüm eksik", validator.check_report, GOOD_REPORT.replace("## Kanıt", "## Notlar"), False),
     ("etiketsiz bulgu", validator.check_report, GOOD_REPORT.replace("- [ÖNERİ] ", "- "), False),
@@ -774,6 +800,12 @@ def frontmatter(text):
     return fields
 
 
+# Claude Code oturum başında agent listesini kurarken açıklaması aşırı uzun tanımı sessizce atlar;
+# vuln-triage-analyst 1103 karakterle yüklenmedi ve Agent çağrısı "not found" döndü. Sınır belgeli
+# olmadığı için güvenli tarafta duruyoruz.
+AGENT_DESC_LIMIT = 1000
+
+
 def fleet_checks():
     """Agent reyestri ile .claude/agents/ tanımları arasında kayma var mı: (açıklama, sonuç).
 
@@ -791,6 +823,8 @@ def fleet_checks():
     yield "her tanım dosyası reyestrde kayıtlı", set(files) <= set(entries)
     yield "dosya adı ile tanımdaki ad aynı", all(f.get("name") == name for name, f in files.items())
     yield "her tanımda açıklama var", all(f.get("description") for f in files.values())
+    yield "açıklamalar yükleme sınırının altında", all(
+        len(f.get("description", "")) <= AGENT_DESC_LIMIT for f in files.values())
     builtin = {n for n, a in entries.items() if a.get("builtin")}
     yield "yerleşik olmayan her agent'ın tanım dosyası var", set(entries) - builtin == set(files)
     yield "yerleşik agent'lara araç yazılmaz", all(not entries[n]["tools"] for n in builtin)
@@ -1503,6 +1537,21 @@ def main():
         tmp.write_text(GOOD_IR, encoding="utf-8")
         out = run_hook("validator.py", payload)
         report(bool(out) and out.get("decision") == "block", "oltalama raporunda K1-K6 tablosu kabul edilmez")
+    finally:
+        tmp.unlink(missing_ok=True)
+
+    # Zafiyet kontrolü dosya adındaki '_vuln_' ile devreye girer; kalıcılık ve oltalama tabloları burada aranmaz.
+    tmp = P("reports") / "_test_vuln_gecici.md"
+    try:
+        tmp.write_text(GOOD_REPORT, encoding="utf-8")
+        payload = {"hook_event_name": "PostToolUse", "tool_name": "Write", "tool_input": {"file_path": str(tmp)}}
+        out = run_hook("validator.py", payload)
+        report(bool(out) and out.get("decision") == "block", "'_vuln_' raporunda V1-V6 tablosu zorunlu")
+        tmp.write_text(GOOD_VULN, encoding="utf-8")
+        report(run_hook("validator.py", payload) is None, "tam zafiyet raporu geçer")
+        tmp.write_text(GOOD_PHISH, encoding="utf-8")
+        out = run_hook("validator.py", payload)
+        report(bool(out) and out.get("decision") == "block", "zafiyet raporunda P1-P6 tablosu kabul edilmez")
     finally:
         tmp.unlink(missing_ok=True)
 

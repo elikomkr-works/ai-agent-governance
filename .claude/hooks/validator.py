@@ -37,8 +37,11 @@ ITEM = re.compile(r"^\s*([-*]|\d+\.|\|)")
 IR_REPORT = re.compile(r"_ir_[^/]*\.md$")
 # Oltalama triyaj raporları (phishing-triage skill'i) için ek yapı kontrolü.
 PHISH_REPORT = re.compile(r"_phish_[^/]*\.md$")
+# Zafiyet triyaj raporları (vuln-triage skill'i) için ek yapı kontrolü.
+VULN_REPORT = re.compile(r"_vuln_[^/]*\.md$")
 PERSISTENCE_ITEMS = [f"K{i}" for i in range(1, 7)]
 PHISH_ITEMS = [f"P{i}" for i in range(1, 7)]
+VULN_ITEMS = [f"V{i}" for i in range(1, 7)]
 PERSISTENCE_RESULTS = ("İZ VAR", "İZ YOK", "KANIT YOK")
 SHA256 = re.compile(r"\b[0-9a-fA-F]{64}\b")
 AGENT_STATUSES = {"ADAY", "KARANTINADA", "DOGRULAMADAN_GECTI", "REDDEDILDI", "YENIDEN_INCELENIYOR"}
@@ -132,6 +135,16 @@ def check_phish_report(text):
     Hash ve itibar sorgusu bu skill'in kapsamı dışında olduğu için SHA-256 aranmaz.
     """
     return checklist_errors(split_sections(text), PHISH_ITEMS, "Oltalama kontrol listesinde")
+
+
+def check_vuln_report(text):
+    """Zafiyet triyaj raporu (adında '_vuln_'): V1–V6 kontrol listesi, toplam 6 madde.
+
+    Girdi makine üretimi bir iddia listesidir; kanıt bütünlüğü hash'i bu skill'in kapsamı
+    dışında olduğu için SHA-256 aranmaz. Sayım ifadeleri ve tekilleştirme haritası
+    reviewer'ın işi, Validator'ın değil.
+    """
+    return checklist_errors(split_sections(text), VULN_ITEMS, "Zafiyet kontrol listesinde")
 
 
 def find_verdict(text, choices):
@@ -298,6 +311,8 @@ def check_file(path, govlib):
             errors = check_ir_report(text)
         elif PHISH_REPORT.search(rel):
             errors = check_phish_report(text)
+        elif VULN_REPORT.search(rel):
+            errors = check_vuln_report(text)
     return rel, errors
 
 
