@@ -1438,7 +1438,14 @@ def web_checks():
                 "Reviewer Kararı" in prompt and "user's step" in prompt)
 
         # Uçtan uca HTTP: model yerine raporu yazan sahte bir koşu.
-        from starlette.testclient import TestClient  # noqa: PLC0415
+        # TestClient starlette'in yanında httpx de ister; ikisi de sdk/web.py'nin
+        # koşma şartı, testin değil. Yoksa bu blok ATLANDI olarak görünür ki
+        # ince koşu yeşil sayılmasın (bkz. main'deki report).
+        try:
+            from starlette.testclient import TestClient  # noqa: PLC0415
+        except ImportError:
+            yield "uçtan uca HTTP (starlette+httpx gerekir)", None
+            return
 
         async def fake_run(prompt, agent=None, **kw):
             path = re.search(r"to (\S+\.md)", prompt).group(1)

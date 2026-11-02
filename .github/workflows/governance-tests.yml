@@ -18,6 +18,11 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      # Web katmanının koşma şartları. claude-agent-sdk kurulmaz: bu iş bir
+      # model çağırmaz, SDK'sız koşuyu testler kendileri karşılıyor. httpx
+      # yalnızca starlette'in TestClient'ı için gerekir, sdk/web.py istemez.
+      - name: Web katmanı bağımlılıkları
+        run: python3 -m pip install "starlette>=0.40" "python-multipart>=0.0.9" httpx
       - name: Hook testleri
         run: python3 tests/test_governance.py
       - name: Başlatıcı Linux'ta Python buluyor mu
