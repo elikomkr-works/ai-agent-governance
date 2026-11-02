@@ -22,6 +22,9 @@ Two deliberate decisions:
   CLI underneath the SDK would ALSO run `.claude/settings.json`'s command hooks,
   so every tool call would pass the gate twice and write two audit records. The
   callbacks registered here are the single path.
+- The sandbox block of `.claude/settings.json` is carried across by hand
+  (`sandbox_settings()`), because `setting_sources=[]` means the CLI never reads
+  that file itself. It is read, not retyped: the rules stay in one place.
 - Least privilege comes from `governance/agents_registry.json`, the same file the
   drift tests check against the agent definitions. An agent's tool list is not
   retyped in this layer, so it cannot drift from the definition that grants it.
@@ -114,6 +117,50 @@ def decide_validator(input_data, event):
         return {"decision": "block", "reason": reason}
 
 
+# Keys of `.claude/settings.json` → sandbox that the SDK's SandboxSettings has no
+# place for. `failIfUnavailable` is a Claude Code startup rule, and `credentials`
+# is a CLI-side file guard; neither is a sandbox setting the SDK accepts. They are
+# named here so that a key added to the settings file later cannot be dropped in
+# silence -- a test asserts this set is exactly what `sandbox_settings()` leaves out.
+SANDBOX_KEYS_NOT_IN_SDK = frozenset({"failIfUnavailable", "credentials"})
+
+# Set GOV_SANDBOX_NESTED=1 where the sandbox runs inside an unprivileged container
+# (bubblewrap cannot nest there otherwise). It weakens the sandbox, so it is opt-in.
+NESTED_SANDBOX_ENV = "GOV_SANDBOX_NESTED"
+
+
+def sandbox_settings(platform=None, env=None):
+    """The SDK's sandbox settings, read from `.claude/settings.json`, or None.
+
+    The sandbox rules are policy, so they are not retyped here: this reads the same
+    block Claude Code reads and hands the SDK the keys it knows. `setting_sources=[]`
+    keeps the CLI from loading that file itself (it would run the command hooks a
+    second time), which is exactly why the block has to be carried across by hand.
+
+    None means "do not pass a sandbox to the SDK":
+      - the block is absent or `enabled` is not true;
+      - the platform is native Windows, where the sandbox does not exist. Claiming
+        it there would be a false guarantee, and the defence left standing is the
+        Policy Gate -- the same split `.claude/settings.json` already lives with.
+    """
+    platform = sys.platform if platform is None else platform
+    env = os.environ if env is None else env
+    settings_file = ROOT / ".claude" / "settings.json"
+    if not settings_file.exists():
+        return None
+    block = govlib.load_json(settings_file).get("sandbox") or {}
+    if block.get("enabled") is not True or platform.startswith("win"):
+        return None
+
+    from claude_agent_sdk.types import SandboxSettings  # noqa: PLC0415
+
+    known = set(SandboxSettings.__annotations__)
+    out = {k: v for k, v in block.items() if k in known}
+    if str(env.get(NESTED_SANDBOX_ENV, "")).strip() not in ("", "0", "false"):
+        out["enableWeakerNestedSandbox"] = True
+    return out
+
+
 def agent_tools(name):
     """The tool list the registry grants an agent, or None for an unknown name."""
     registry = govlib.load_json(govlib.path("agents_registry"))
@@ -174,6 +221,12 @@ def build_options(agent=None, model=None, cwd=None, max_turns=20, **extra):
         options["allowed_tools"] = tools
     if model:
         options["model"] = model
+    # Defence in depth: where the OS supports it, Bash also runs inside the sandbox
+    # the settings file describes. The caller may pass its own `sandbox=` and win.
+    if "sandbox" not in extra:
+        box = sandbox_settings()
+        if box:
+            options["sandbox"] = box
     options.update(extra)
     return ClaudeAgentOptions(**options)
 
@@ -204,5 +257,5 @@ def run_task_sync(prompt, agent=None, **kwargs):
 __all__ = [
     "ROOT", "READ_ONLY", "agent_tools", "build_options", "decide_pre_tool_use",
     "decide_validator", "post_tool_use_hook", "pre_tool_use_hook", "run_task",
-    "run_task_sync", "stop_hook",
+    "run_task_sync", "sandbox_settings", "stop_hook",
 ]

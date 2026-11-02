@@ -99,6 +99,42 @@ Tests: the "Web katmanı" section of `tests/test_governance.py` drives the whole
 HTTP path with the model call stubbed out, so it is free to run and proves the
 routing, the limits and the token guard without spending anything.
 
+## On a server
+
+`sdk/Dockerfile` packages the page and the whole governance layer. The test suite
+travels with it on purpose: it needs no API key and no model call, so a built image
+can be asked whether the enforcement it carries still holds.
+
+```bash
+docker build -f sdk/Dockerfile -t gov-web .
+docker run --rm gov-web python tests/test_governance.py   # 602 pass, 3 skip
+docker run --rm gov-web python sdk/run_agent.py --selftest
+```
+
+The three skips are the two checks that query git — the image has no `.git`, on
+purpose — and the customer-repo section, whose tool derives its allow-list from
+`git ls-files` and cannot run without a repository.
+
+The run is **not root** (uid 10001) and the code is **not writable** by it. The
+second half matters more than the first: `COPY` preserves the source mode, and a
+build context on a Windows drive arrives world-writable, so without
+`chmod -R a-w /app` the non-root user could still edit `policy_gate.py`,
+`policy.json` and the registries. Probed from inside the container: the gate code,
+the policy, the registries, the settings and the skills are refused; `reports/`,
+`work/` and the audit log are writable, which they must be.
+
+Two honest limits. The audit log has to be writable by the run that appends to it,
+so the protection there is not the file mode but the hash chain and
+`tools/verify_audit.py`. And the sandbox being *configured* is proven by test,
+while the sandbox *engaging* inside the container is not — that needs a run with a
+Bash tool call, which needs a model call.
+
+Mounts: the container writes as uid 10001, so hand the folders over on the host
+once (`sudo chown -R 10001:10001 reports work governance/audit.jsonl`), and mount
+the audit log as a file that already exists — Docker creates a directory for a
+missing mount source, and a directory where the chained log belongs breaks the
+chain quietly.
+
 ## Two things worth knowing
 
 **`setting_sources=[]`.** With filesystem settings loaded, the CLI underneath the
@@ -106,10 +142,21 @@ SDK would also run the command hooks in `.claude/settings.json`, so every tool c
 would pass the gate twice and write two audit records. The registered callbacks are
 the single path.
 
-**The sandbox is not in this layer.** Defence in depth here is the gate, the
-validator and the audit log. OS-level restriction of Bash remains the SDK's own
-`sandbox` option (`ClaudeAgentOptions`), and on native Windows it does not apply —
-the same limitation the Claude Code setup has.
+**The sandbox is read, not retyped.** `sandbox_settings()` takes the `sandbox`
+block of `.claude/settings.json` and hands the SDK the keys its `SandboxSettings`
+accepts, so the OS-level restriction of Bash is described in one place even though
+`setting_sources=[]` stops the CLI from reading that file itself. A test asserts the
+two agree, and names the two keys that have no SDK equivalent, so a rule added to
+the settings file later cannot be dropped in silence.
+
+On native Windows it returns `None`: the sandbox does not exist there, and claiming
+it would be a false guarantee — the same split the Claude Code setup lives with.
+What stands in that case is the gate, the validator and the audit log.
+
+Inside an unprivileged container bubblewrap cannot nest, so a sandboxed run there
+needs `GOV_SANDBOX_NESTED=1` (a deliberately weaker sandbox, opt-in) or
+`--privileged`. The image carries bubblewrap and socat, which the sandbox needs on
+Linux and without which it goes quiet rather than loud.
 
 ## Files
 

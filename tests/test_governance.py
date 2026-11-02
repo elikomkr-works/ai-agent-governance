@@ -10,6 +10,7 @@ import json
 import os
 import re
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
@@ -1003,6 +1004,10 @@ def factory_e2e_checks():
     saved = (govlib.ROOT, activate_proposal.ROOT, activate_proposal.AGENTS_DIR, activate_proposal.SKILLS_DIR)
     try:
         shutil.copytree(P("governance"), tmp / R("governance"), ignore=shutil.ignore_patterns("audit_archive"))
+        # copytree taşır kipleri de: kaynak salt okunursa (sunucu imajında
+        # /app salt okunur yapılır) kopya da yazılamaz olur ve sınav çöker.
+        for f in (tmp / R("governance")).rglob("*"):
+            f.chmod(f.stat().st_mode | stat.S_IWUSR)
         (tmp / R("proposals")).mkdir(parents=True)
         govlib.ROOT = activate_proposal.ROOT = tmp
         activate_proposal.AGENTS_DIR = tmp / ".claude" / "agents"
@@ -1601,6 +1606,26 @@ def sdk_checks():
         except ValueError:
             bad_agent = True
         yield "kayıtsız agent ile çalışmaz", bad_agent
+
+        # Sandbox: kurallar .claude/settings.json'da kalır, bu katman yalnızca taşır.
+        # Ayrışma olursa iki ayrı sandbox politikası doğmuş demektir.
+        block = govlib.load_json(ROOT / ".claude" / "settings.json")["sandbox"]
+        linux = runtime.sandbox_settings(platform="linux", env={})
+        yield "Linux'ta sandbox SDK'ya verilir", linux is not None and linux["enabled"] is True
+        yield "sandbox ayarları settings.json ile birebir", all(
+            linux[k] == v for k, v in block.items()
+            if k not in runtime.SANDBOX_KEYS_NOT_IN_SDK)
+        # settings.json'a SDK'nın bildiği yeni bir anahtar eklenirse sessizce düşmesin.
+        from claude_agent_sdk.types import SandboxSettings  # noqa: PLC0415
+        dropped = set(block) - set(SandboxSettings.__annotations__)
+        yield "SDK'ya taşınmayan anahtarlar bilinen listede", dropped == set(runtime.SANDBOX_KEYS_NOT_IN_SDK)
+        yield "Windows'ta sandbox vaat edilmez", runtime.sandbox_settings(platform="win32", env={}) is None
+        nested = runtime.sandbox_settings(platform="linux", env={runtime.NESTED_SANDBOX_ENV: "1"})
+        yield "yetkisiz konteynerde zayıf sandbox isteğe bağlı", nested.get("enableWeakerNestedSandbox") is True
+        yield "zayıf sandbox varsayılan değil", "enableWeakerNestedSandbox" not in linux
+        opts_box = runtime.build_options(agent="log-analyst", sandbox={"enabled": False})
+        yield "çağıran kendi sandbox'ını verebilir", opts_box.sandbox == {"enabled": False}
+
     else:
         hint = ""
         try:
@@ -1608,6 +1633,19 @@ def sdk_checks():
         except ImportError as e:
             hint = str(e)
         yield "SDK kurulu değilse kurulum satırı gösterilir", "sdk/requirements.txt" in hint
+
+    # Sunucu imajı: kendi kurallarını yeniden yazamayan, root olmayan bir koşu.
+    dockerfile = (ROOT / R("sdk") / "Dockerfile").read_text(encoding="utf-8")
+    yield "imaj root olarak koşmaz", "\nUSER 10001" in dockerfile
+    yield "sandbox paketleri imajda", all(
+        dep in dockerfile for dep in ("bubblewrap", "socat"))
+    chown = [ln for ln in dockerfile.splitlines()
+             if "chown -R 10001" in ln and not ln.lstrip().startswith("#")]
+    yield "yalnızca yazılan klasörler devredilir", len(chown) == 1 and all(
+        d in chown[0] for d in
+        ("reports", "work", "deliverables", "knowledge", "proposals", "audit.jsonl"))
+    yield "yönetişim dosyaları koşan kullanıcıya ait değil", not any(
+        d in chown[0] for d in ("governance governance", ".claude", "/app ", " tools", " tests"))
 
     req = (ROOT / R("sdk") / "requirements.txt").read_text(encoding="utf-8")
     yield "requirements claude-agent-sdk pinler", "claude-agent-sdk" in req
