@@ -12,7 +12,7 @@
     {"name": "cve-researcher", "role": "CVE Researcher", "skills": ["cve-research"], "writes": ["@quarantine", "@work"], "tools": ["Read", "Glob", "Write", "WebSearch", "WebFetch", "Skill"]},
     {"name": "incident-responder", "role": "Incident Response Analyst — host evidence, read-only, Bash limited to hash/count (stage 2, agent_shell)", "skills": ["incident-response"], "writes": ["@reports", "@work"], "tools": ["Read", "Grep", "Glob", "Write", "Skill", "Bash"], "shell": "limited"},
     {"name": "deliverable-writer", "role": "Customer Deliverable Writer — approved report → customer document in the customer's language", "skills": ["deliverable"], "writes": ["@deliverables", "@work"], "tools": ["Read", "Grep", "Glob", "Write", "Skill"]},
-    {"name": "reviewer", "role": "Independent Auditor — content accuracy, recount", "skills": [], "writes": [], "tools": ["Read", "Grep", "Glob", "Bash", "WebFetch"], "shell": "broad"},
+    {"name": "reviewer", "role": "Independent Auditor — content accuracy, recount, Bash limited to count/hash tools (agent_shell)", "skills": [], "writes": [], "tools": ["Read", "Grep", "Glob", "Bash", "WebFetch"], "shell": "limited"},
     {"name": "skill-smith", "role": "Skill Smith — new skill/agent drafts", "skills": [], "writes": ["@proposals"], "tools": ["Read", "Glob", "Grep", "Write"]},
     {"name": "Explore", "role": "Built-in read-only search agent", "skills": [], "writes": [], "tools": [], "builtin": true},
     {"name": "Plan", "role": "Built-in planning agent", "skills": [], "writes": [], "tools": [], "builtin": true},

@@ -21,6 +21,7 @@ skill-scout  log-analyst  config-auditor  cve-researcher  reviewer  skill-smith
 ```
 Extra specialist: `deliverable-writer` (×N parallel, turns an approved report into the customer's document; no Bash, no network).
 Extra specialist: `incident-responder` (×N parallel, reviews host evidence; stage 2: Bash limited to hash/count tools — `policy.json` → `agent_shell`; any command touching the evidence folder is limited by `evidence_guard`).
+`reviewer` is also `limited`: count/hash tools only, no interpreter, so it cannot build a protected path from pieces; tools that can still write through a flag are bound by `policy.json` → `restricted_args`.
 No limit on the number of specialists; several copies of one agent may run in parallel.
 Platform limit: subagents cannot spawn subagents, so all coordination goes through the Lead Agent.
 Registry: `governance/agents_registry.json`. Definitions: `.claude/agents/*.md`.

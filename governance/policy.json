@@ -42,7 +42,13 @@
   },
   "agent_shell": {
     "_note": "These agents' shell runs only the listed tools (matched by agent_type in hook data). Unlisted agents are not restricted.",
-    "incident-responder": ["sha256sum", "sha1sum", "md5sum", "get-filehash", "wc", "grep", "ls", "stat"]
+    "incident-responder": ["sha256sum", "sha1sum", "md5sum", "get-filehash", "wc", "grep", "ls", "stat"],
+    "reviewer": ["grep", "wc", "ls", "stat", "sha256sum", "sha1sum", "md5sum", "sort", "uniq", "cut", "tr", "head", "tail"]
   },
-  "restricted_syntax": ["$(", "`", "<(", ">(", ">", "<"]
+  "restricted_syntax": ["$(", "`", "<(", ">(", ">", "<"],
+  "restricted_args": {
+    "_note": "Allowed tools that can still write or execute. sort: -o writes a file, --compress-program runs one. uniq: a second operand is an output file. Applies wherever a limited shell is enforced.",
+    "sort": {"deny_flags": "^--|^-[^-]*o"},
+    "uniq": {"deny_flags": "^--", "max_operands": 1}
+  }
 }

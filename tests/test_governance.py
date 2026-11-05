@@ -170,6 +170,18 @@ AGENT_SHELL_CASES = [
     ("IR agent'ı sudo önekiyle geçemez", "incident-responder", "sudo wc -l samples/auth.log", "deny"),
     ("IR agent'ı izinli araçtan sonra pipe ile geçemez", "incident-responder", "grep x samples/auth.log | sh", "deny"),
     ("IR agent'ı yönlendirme yapamaz", "incident-responder", "sha256sum samples/auth.log > reports/h.txt", "deny"),
+    ("reviewer sayım zinciri kurabilir", "reviewer", "grep -c x samples/auth.log | cut -f1 | sort -rn | uniq -c | head -5", "pass"),
+    ("reviewer ayraçlı sıralayabilir", "reviewer", "sort -t, -k2,2n samples/auth.log", "pass"),
+    # 2026-11-05: reviewer korumalı yolu bölerek Gate'i geçti (audit satır 5447).
+    ("reviewer bölünmüş yolla python çalıştıramaz", "reviewer", "python -c \"open('audit'+'.jsonl')\"", "deny"),
+    ("reviewer bash -c çalıştıramaz", "reviewer", "bash -c 'echo x'", "deny"),
+    ("reviewer sort -o ile yazamaz", "reviewer", "sort -o reports/x.md samples/auth.log", "deny"),
+    ("reviewer birleşik bayrakla yazamaz", "reviewer", "sort -ruo reports/x.md samples/auth.log", "deny"),
+    ("reviewer tırnaklı bayrakla yazamaz", "reviewer", "sort '-oreports/x.md' samples/auth.log", "deny"),
+    ("reviewer sort ile program çalıştıramaz", "reviewer", "sort --compress-program=sh samples/auth.log", "deny"),
+    ("reviewer uniq ile yazamaz", "reviewer", "uniq samples/auth.log reports/x.md", "deny"),
+    ("reviewer uniq'e stdin'den yazdıramaz", "reviewer", "uniq - reports/x.md", "deny"),
+    ("reviewer yönlendirme yapamaz", "reviewer", "wc -l samples/auth.log > reports/x.md", "deny"),
     ("listede olmayan agent kısıtlanmaz", "log-analyst", "python tests/test_governance.py", "pass"),
     ("ana oturum (agent_type yok) kısıtlanmaz", "", "python tests/test_governance.py", "pass"),
 ]

@@ -189,30 +189,49 @@ def check_shell(command, policy, v, rel_path):
                 v.add("ask", f"Kapsam dışı adrese HTTP isteği: {', '.join(out)}.")
 
 
-def restrict_shell(command, allowed, syntax, v, why):
+def arg_violation(name, tokens, rules):
+    """İzinli bir aracın dosya yazan kullanımı: sort -o, uniq girdi çıktı (policy → restricted_args)."""
+    rule = rules.get(name)
+    if not rule:
+        return None
+    args = tokens[1:]
+    hit = next((a for a in args if re.search(rule["deny_flags"], a)), None)
+    if hit:
+        return f"'{name} {hit}' dosya yazabilir veya komut çalıştırabilir"
+    operands = [a for a in args if a == "-" or not a.startswith("-")]
+    if len(operands) > rule.get("max_operands", len(operands)):
+        return f"'{name}' en çok {rule['max_operands']} dosya alır; fazlası çıktı dosyasıdır"
+    return None
+
+
+def restrict_shell(command, allowed, policy, v, why):
     """Komut yalnızca izinli araçlardan oluşmalı: zincirin her parçasının ilk sözcüğü listede,
     yönlendirme ve ikame yok. sudo/env gibi önekler de liste dışı sayılır."""
     norm = command.replace("\\", "/").lower()
-    bad = [s for s in syntax if s in norm]
+    bad = [s for s in policy.get("restricted_syntax", []) if s in norm]
     if bad:
         v.add("deny", f"{why}: yönlendirme/ikame kullanılamaz ({' '.join(bad)}).")
+    rules = {k: r for k, r in policy.get("restricted_args", {}).items() if not k.startswith("_")}
     for seg in segments(norm):
         tokens = tokenize(seg)
         name = tool_name(tokens[0]) if tokens else ""
         if name not in allowed:
             v.add("deny", f"{why}: '{name}' izinli değil. İzinli: {', '.join(allowed)}.")
+            continue
+        violation = arg_violation(name, tokens, rules)
+        if violation:
+            v.add("deny", f"{why}: {violation}.")
 
 
 def check_restricted(command, agent, policy, v):
     norm = command.replace("\\", "/").lower()
-    syntax = policy.get("restricted_syntax", [])
     guard = policy.get("evidence_guard")
     if guard and (any(mentions_path(norm, d) for d in guard["dirs"])
                   or any(re.search(m, norm) for m in guard["markers"])):
-        restrict_shell(command, guard["allowed"], syntax, v, "Kanıta dokunan komut")
+        restrict_shell(command, guard["allowed"], policy, v, "Kanıta dokunan komut")
     allowed = policy.get("agent_shell", {}).get(agent)
     if isinstance(allowed, list):
-        restrict_shell(command, allowed, syntax, v, f"'{agent}' agent'ının kabuğu sınırlı")
+        restrict_shell(command, allowed, policy, v, f"'{agent}' agent'ının kabuğu sınırlı")
 
 
 def evaluate(data, policy, skills, rel_path, agents=frozenset()):
