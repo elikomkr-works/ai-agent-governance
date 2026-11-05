@@ -690,7 +690,9 @@ def ir_collect_checks():
     yield "toplama betiği eski kanıtın üzerine yazmaz", 'if [ -e "$OUT" ]' in script
     bash = shutil.which("bash")
     if bash:
-        yield "toplama betiği sözdizimi geçerli", subprocess.run([bash, "-n", str(P("tools") / "ir_collect.sh")]).returncode == 0
+        # Göreli yol: Windows'ta bash WSL'in başlatıcısı olabilir, C:\... yolunu tanımaz.
+        rel = (P("tools") / "ir_collect.sh").relative_to(ROOT).as_posix()
+        yield "toplama betiği sözdizimi geçerli", subprocess.run([bash, "-n", rel], cwd=ROOT).returncode == 0
     # Gerçek çalıştırma root ister: CI'da (Linux, parolasız sudo) yapılır, yerelde atlanır.
     # Yoklamanın kendisi de çökmemeli: konteyner imajında sudo kurulu değil
     # (zaten root koşuyor), orada bu blok sessizce atlanır.
@@ -844,6 +846,12 @@ def frontmatter(text):
 AGENT_DESC_LIMIT = 1000
 
 
+def crlf_definitions():
+    """Agent ve skill tanımlarından CRLF satır sonu taşıyanların yolları."""
+    roots = [(ROOT / ".claude" / "agents").glob("*.md"), (ROOT / ".claude" / "skills").glob("*/*.md")]
+    return sorted(str(p.relative_to(ROOT)) for g in roots for p in g if b"\r\n" in p.read_bytes())
+
+
 def fleet_checks():
     """Agent reyestri ile .claude/agents/ tanımları arasında kayma var mı: (açıklama, sonuç).
 
@@ -863,6 +871,10 @@ def fleet_checks():
     yield "her tanımda açıklama var", all(f.get("description") for f in files.values())
     yield "açıklamalar yükleme sınırının altında", all(
         len(f.get("description", "")) <= AGENT_DESC_LIMIT for f in files.values())
+    # Tanım dosyasının frontmatter'ında CRLF varsa Claude Code agent'ı sessizce atlar:
+    # kayıt, araç listesi ve testler doğru görünür, Agent çağrısı 'not found' der.
+    # vuln-triage-analyst bir oturumu tam buna kaybetti (2026-11-02).
+    yield "tanım dosyaları CRLF içermiyor", not crlf_definitions()
     builtin = {n for n, a in entries.items() if a.get("builtin")}
     yield "yerleşik olmayan her agent'ın tanım dosyası var", set(entries) - builtin == set(files)
     yield "yerleşik agent'lara araç yazılmaz", all(not entries[n]["tools"] for n in builtin)

@@ -1,5 +1,8 @@
 # Bash betikleri Linux'ta (bulut) CRLF ile çalışmaz.
 *.sh text eol=lf
+# Agent ve skill tanımları: frontmatter'da CRLF olursa Claude Code dosyayı sessizce atlar.
+.claude/agents/*.md text eol=lf
+.claude/skills/**/*.md text eol=lf
 # Örnek kanıt seti: MANIFEST.sha256 bayt bayt eşleşmeli, satır sonu dönüştürülmez.
 samples/ir-web01/** -text
 # Synthetic DC01 scenario set: same rule, MANIFEST must match byte for byte.
